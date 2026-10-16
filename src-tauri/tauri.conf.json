@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "L4-Notchbar",
+  "productName": "Google NotchBar",
   "version": "1.7.0",
   "identifier": "app.notch.windows",
   "build": {
@@ -14,7 +14,7 @@
     "windows": [
       {
         "label": "notch",
-        "title": "L4-Notchbar",
+        "title": "Google NotchBar",
         "width": 760,
         "height": 560,
         "x": 0,
