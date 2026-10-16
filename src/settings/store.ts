@@ -172,10 +172,7 @@ export const firstRun = (() => {
   }
 })();
 
-export const settings = createStore<Settings>(defaults, { persist: "settings" });
-
-// Fill in settings from older versions: new fields + append new tools.
-settings.set((s) => {
+export function normalizeSettings(s: Settings): Settings {
   const known = new Set<string>(TOOL_IDS);
   const tools = (s.tools ?? []).filter((t) => known.has(t.id));
   for (const id of TOOL_IDS) {
@@ -200,7 +197,12 @@ settings.set((s) => {
     appearance: { ...defaults.appearance, ...s.appearance },
     ask: migrateAsk(s.ask),
   };
-});
+}
+
+export const settings = createStore<Settings>(defaults, { persist: "settings", normalize: normalizeSettings });
+
+// Fill in settings from older versions: new fields + append new tools.
+settings.set(normalizeSettings);
 
 /** Migrates the old shape ({ provider: "demo", model }) and adds missing providers. */
 function migrateAsk(old: Partial<Settings["ask"]> | undefined): Settings["ask"] {

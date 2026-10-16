@@ -20,6 +20,7 @@ mod system;
 mod trading;
 pub mod usage;
 mod vault;
+mod config;
 
 use std::sync::Mutex;
 
@@ -149,6 +150,8 @@ pub fn run() {
             set_language,
             autostart_get,
             autostart_set,
+            config::config_save,
+            config::config_load,
         ])
         .setup(move |app| {
             let window = app.get_webview_window("notch").expect("window 'notch' missing");
