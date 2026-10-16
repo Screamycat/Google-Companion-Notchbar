@@ -72,11 +72,11 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
         with:
           tagName: v__VERSION__
-          releaseName: L4-Notchbar v__VERSION__
+          releaseName: Google NotchBar v__VERSION__
           releaseDraft: false
           prerelease: false
           releaseBody: |
-            **Install:** download `L4-Notchbar_${{ needs.check.outputs.version }}_x64-setup.exe` below and run it. No admin rights or developer tools needed.
+            **Install:** download `Google NotchBar_${{ needs.check.outputs.version }}_x64-setup.exe` below and run it. No admin rights or developer tools needed.
             Already installed? The app offers this version under **Settings → General → Updates**.
 
             Windows SmartScreen may warn because the installer is not code-signed yet: **More info → Run anyway**.

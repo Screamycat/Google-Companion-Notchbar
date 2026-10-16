@@ -1,4 +1,4 @@
-<h1 align="center">L4-Notchbar</h1>
+<h1 align="center">Google NotchBar</h1>
 
 <p align="center">
   <b>Windows never had a Dynamic Island. Now it does.</b>
