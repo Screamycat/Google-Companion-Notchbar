@@ -165,22 +165,25 @@ export function NotchCompanion({ status, activeTab, size, geometry, line }: Notc
           ease: "easeInOut",
         }}
       >
-        {/* Optional headphones arc when in Music tab */}
+        {/* Optional headphones: two side puffs hugging the ears + concentric headband just above head line */}
         {variant === "music" && (
           <svg
             viewBox="0 0 100 100"
-            className="pointer-events-none absolute inset-[-6%] size-[112%] overflow-visible"
+            className="pointer-events-none absolute inset-0 size-full overflow-visible"
             aria-hidden
           >
+            {/* Concentric headband hovering just above the circular head contour */}
             <path
-              d="M 9 27 A 45 45 0 0 1 91 27"
+              d="M -2 36 A 54 54 0 0 1 102 36"
               fill="none"
               stroke="var(--accent, #4285f4)"
               strokeWidth="5"
               strokeLinecap="round"
             />
-            <rect x="3" y="25" width="10" height="20" rx="5" fill="var(--accent, #4285f4)" />
-            <rect x="87" y="25" width="10" height="20" rx="5" fill="var(--accent, #4285f4)" />
+            {/* Left ear puff on the exact left side */}
+            <rect x="-8" y="35" width="12" height="26" rx="6" fill="var(--accent, #4285f4)" />
+            {/* Right ear puff on the exact right side */}
+            <rect x="96" y="35" width="12" height="26" rx="6" fill="var(--accent, #4285f4)" />
           </svg>
         )}
 
