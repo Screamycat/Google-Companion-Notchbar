@@ -165,25 +165,25 @@ export function NotchCompanion({ status, activeTab, size, geometry, line }: Notc
           ease: "easeInOut",
         }}
       >
-        {/* Optional headphones: two side puffs on the edge of his head + headband with slightly larger diameter */}
+        {/* Optional headphones: two side puffs hugging the ears + concentric headband just above head line */}
         {variant === "music" && (
           <svg
             viewBox="0 0 100 100"
             className="pointer-events-none absolute inset-0 size-full overflow-visible"
             aria-hidden
           >
-            {/* Headband with slightly larger diameter than head, floating neatly above the white head line */}
+            {/* Concentric headband floating above the head line with a larger radius */}
             <path
-              d="M 0 30 A 53 53 0 0 1 100 30"
+              d="M -5 36 A 57 57 0 0 1 105 36"
               fill="none"
               stroke="var(--accent, #4285f4)"
-              strokeWidth="4.5"
+              strokeWidth="5"
               strokeLinecap="round"
             />
-            {/* Left ear puff centered right on the left edge of his head */}
-            <rect x="-5" y="27" width="10" height="26" rx="5" fill="var(--accent, #4285f4)" />
-            {/* Right ear puff centered right on the right edge of his head */}
-            <rect x="95" y="27" width="10" height="26" rx="5" fill="var(--accent, #4285f4)" />
+            {/* Left ear puff on the outer edge of the head */}
+            <rect x="-11" y="36" width="12" height="26" rx="6" fill="var(--accent, #4285f4)" />
+            {/* Right ear puff on the outer edge of the head */}
+            <rect x="99" y="36" width="12" height="26" rx="6" fill="var(--accent, #4285f4)" />
           </svg>
         )}
 
