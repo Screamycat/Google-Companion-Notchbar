@@ -31,7 +31,23 @@ export function NotchShape({ geometry, transition, elevated, tone, children }: P
   const r = useMotionValue(geometry.r);
   const ear = useMotionValue(geometry.ear);
   const shadow = useMotionValue(elevated ? 1 : 0);
-  const earOffset = useTransform(ear, (e) => -e + 0.5); // 0.5px overlap against hairlines
+
+  // Ears never exceed body height or poke out when height collapses toward 0
+  const effectiveEar = useTransform([ear, h], (values: number[]) => {
+    const [e = 0, curH = 0] = values;
+    return Math.max(0, Math.min(e, curH));
+  });
+  const earOffset = useTransform(effectiveEar, (e: number) => -e + 0.5); // 0.5px overlap against hairlines
+  const earOpacity = useTransform(effectiveEar, (e: number) => (e > 0.5 ? 1 : 0));
+
+  // The bottom corners must remain rounded throughout the entire closing animation.
+  // We guarantee effectiveR preserves the roundness all the way until height reaches 0.
+  const effectiveR = useTransform([r, h], (values: number[]) => {
+    const [curR = 0, curH = 0] = values;
+    if (curH <= 0.5) return 0;
+    return Math.max(curR, Math.min(curH * 0.45, 20));
+  });
+
   // Whole device pixels: the shape is centered, so an odd or fractional size puts its edges
   // (and the cover pinned to them) on subpixels that shift every frame, which reads as jitter.
   const wPx = useTransform(w, snap);
@@ -59,21 +75,23 @@ export function NotchShape({ geometry, transition, elevated, tone, children }: P
     <motion.div className="relative" style={{ width: wPx, height: hPx }}>
       <motion.span
         aria-hidden
-        className="absolute top-0"
+        className="absolute top-0 pointer-events-none"
         style={{
           left: earOffset,
-          width: ear,
-          height: ear,
+          width: effectiveEar,
+          height: effectiveEar,
+          opacity: earOpacity,
           background: `radial-gradient(circle farthest-side at 0% 100%, transparent calc(100% - 0.75px), ${tone.solid} 100%)`,
         }}
       />
       <motion.span
         aria-hidden
-        className="absolute top-0"
+        className="absolute top-0 pointer-events-none"
         style={{
           right: earOffset,
-          width: ear,
-          height: ear,
+          width: effectiveEar,
+          height: effectiveEar,
+          opacity: earOpacity,
           background: `radial-gradient(circle farthest-side at 100% 100%, transparent calc(100% - 0.75px), ${tone.solid} 100%)`,
         }}
       />
@@ -82,8 +100,8 @@ export function NotchShape({ geometry, transition, elevated, tone, children }: P
         className="absolute inset-0"
         style={{
           opacity: shadow,
-          borderBottomLeftRadius: r,
-          borderBottomRightRadius: r,
+          borderBottomLeftRadius: effectiveR,
+          borderBottomRightRadius: effectiveR,
           boxShadow: `0 18px 40px -10px rgb(0 0 0 / 0.7), 0 4px 12px rgb(0 0 0 / 0.35)${tone.glow ? `, ${tone.glow}` : ""}`,
         }}
       />
@@ -91,8 +109,8 @@ export function NotchShape({ geometry, transition, elevated, tone, children }: P
         // clip instead of hidden: no scroll container, so focus/scrollIntoView can't shift the content.
         className="absolute inset-0 overflow-clip bg-notch"
         style={{
-          borderBottomLeftRadius: r,
-          borderBottomRightRadius: r,
+          borderBottomLeftRadius: effectiveR,
+          borderBottomRightRadius: effectiveR,
           background: tone.wash ? tone.wash.color : tone.solid,
           backdropFilter: tone.wash ? `blur(${tone.wash.blur}px)` : undefined,
         }}

@@ -1,15 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createStore } from "../lib/store";
 import { setPinned } from "../platform/native";
-import { hoverDelayMs, settings } from "../settings/store";
+import { settings } from "../settings/store";
 
 export type NotchStatus = "closed" | "peek" | "open";
-
-/** Delays in ms. The hover delay comes from the settings. */
-export const timing = {
-  /** Grace period on leave, so slipping off briefly doesn't close it. */
-  leaveClose: 180,
-};
 
 /*
  * "Hold": while dragging (seeking, drag and drop) the notch stays open and
@@ -25,9 +19,7 @@ export function holdOpen(on: boolean) {
 
 /*
  * Pin (top right): the notch stays open even when the cursor leaves or another
- * app takes focus, e.g. to drag files from Explorer or copy a key from the
- * browser. Unlike `holdOpen`, the window stays click-through outside the notch.
- * Esc / the shortcut close and unpin it.
+ * app takes focus. Esc / the shortcut close and unpin it.
  */
 export const pinned = createStore(false);
 
@@ -36,17 +28,14 @@ export function togglePin() {
 }
 
 /**
- * Notch state machine:
+ * 3-Stage Notch state machine:
  *
- *   closed ──hover──▶ peek ──hover held / click──▶ open
- *     ▲                 │                               │
- *     └────leave────┘◀──leave (grace) / Esc / click outside
+ *   Stage 1 (closed / hidden) ──hover──▶ Stage 2 (peek) ──hover held ≥ hoverDelayMs / click──▶ Stage 3 (open)
+ *     ▲                                        │                                                     │
+ *     └────────────────leave───────────────────┘◀──────────leave (leaveDelayMs) / Esc / click outside
  *
  *   Shortcut: closed ⇄ open directly, no peek and no delay.
  *   While typing, holding or pinned, leaving doesn't close.
- *
- *   close()   close on purpose (Esc, shortcut), also unpins.
- *   dismiss() close casually (click outside, focus loss), not when pinned.
  */
 export function useNotchState() {
   const [status, setStatusState] = useState<NotchStatus>("closed");
@@ -79,7 +68,6 @@ export function useNotchState() {
   }, [setStatus]);
 
   const dismiss = useCallback(() => {
-    // Held (dragging, Windows Hello dialog in front) counts like pinned.
     if (pinned.get() || holds.get() > 0) return;
     window.clearTimeout(timer.current);
     setStatus("closed");
@@ -100,17 +88,19 @@ export function useNotchState() {
     window.clearTimeout(timer.current);
     if (statusRef.current === "closed") {
       setStatus("peek");
-      // "Click" mode: only nudge, open on click.
-      const s = settings.get();
-      if (s.openMode === "hover") later(hoverDelayMs[s.hoverDelay], "open");
+      const { notch } = settings.get();
+      if (notch.openMode === "hover") {
+        later(notch.hoverDelayMs, "open");
+      }
     }
   }, [setStatus, later]);
 
   const onPointerLeave = useCallback(() => {
     hovering.current = false;
     window.clearTimeout(timer.current);
+    const { notch } = settings.get();
     if (statusRef.current === "peek") setStatus("closed");
-    else if (statusRef.current === "open" && mayAutoClose()) later(timing.leaveClose, "closed");
+    else if (statusRef.current === "open" && mayAutoClose()) later(notch.leaveDelayMs, "closed");
   }, [setStatus, later]);
 
   // Hold ended and the cursor is outside → handle the missed leave now.
@@ -118,7 +108,7 @@ export function useNotchState() {
     () =>
       holds.subscribe(() => {
         if (!hovering.current && statusRef.current === "open" && mayAutoClose()) {
-          later(timing.leaveClose, "closed");
+          later(settings.get().notch.leaveDelayMs, "closed");
         }
       }),
     [later],
@@ -128,7 +118,9 @@ export function useNotchState() {
   useEffect(
     () =>
       pinned.subscribe(() => {
-        if (!pinned.get() && !hovering.current && statusRef.current === "open" && mayAutoClose()) later(timing.leaveClose, "closed");
+        if (!pinned.get() && !hovering.current && statusRef.current === "open" && mayAutoClose()) {
+          later(settings.get().notch.leaveDelayMs, "closed");
+        }
       }),
     [later],
   );

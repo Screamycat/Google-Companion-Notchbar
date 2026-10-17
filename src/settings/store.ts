@@ -1,26 +1,74 @@
 import { createStore } from "../lib/store";
 import type { AlarmDuration, AlarmSound } from "../lib/sound";
 
-export type AskProvider = "openrouter" | "openai" | "anthropic" | "custom";
-export type AskEffort = "low" | "medium" | "high" | "xhigh";
+export interface NotchTuning {
+  /** Hold time in Stage 2 (Peek) before Stage 3 (Open dropdown) triggers (ms). */
+  hoverDelayMs: number;
+  /** Grace period on mouse leave before closing (ms). */
+  leaveDelayMs: number;
+  /** Open dropdown automatically after hoverDelayMs, or require click in Peek. */
+  openMode: "hover" | "click";
 
-export interface AskProviderConfig {
-  model: string;
-  effort: AskEffort;
-  /** Only for "custom": OpenAI-compatible base, e.g. https://…/v1 */
-  baseUrl: string;
+  /** Stage 1: Hidden top-center trigger zone dimensions (CSS px). */
+  triggerW: number;
+  triggerH: number;
+  /** Show a subtle 3px pill line when hidden, or keep 100% invisible. */
+  showHintLine: boolean;
+
+  /** Stage 2: Peek island dimensions when cursor enters trigger zone (CSS px). */
+  peekW: number;
+  peekH: number;
+
+  /** Stage 3: Open dropdown dimensions & shape radii (CSS px). */
+  openW: number;
+  openH: number;
+  cornerRadius: number;
+  earRadius: number;
+
+  /** Companion base diameter in the open tabs (CSS px). */
+  companionSize: number;
+
+  /** Animation spring physics (visualDuration in seconds, bounce 0..0.5). */
+  peekDuration: number;
+  peekBounce: number;
+  openDuration: number;
+  openBounce: number;
+  closeDuration: number;
+  closeBounce: number;
+  morphDuration: number;
 }
 
+export const DEFAULT_NOTCH_TUNING: NotchTuning = {
+  hoverDelayMs: 320,
+  leaveDelayMs: 180,
+  openMode: "hover",
+  triggerW: 180,
+  triggerH: 6,
+  showHintLine: false,
+  peekW: 164,
+  peekH: 48,
+  openW: 540,
+  openH: 300,
+  cornerRadius: 30,
+  earRadius: 14,
+  companionSize: 78,
+  peekDuration: 0.28,
+  peekBounce: 0.28,
+  openDuration: 0.42,
+  openBounce: 0.22,
+  closeDuration: 0.3,
+  closeBounce: 0.04,
+  morphDuration: 0.34,
+};
+
 export interface Settings {
-  /** Open on hover or only on click. */
+  /** Open on hover or only on click (kept synced with notch.openMode). */
   openMode: "hover" | "click";
   hoverDelay: "fast" | "normal" | "patient";
+  /** Live tunable parameters for our 3-stage notch & companion. */
+  notch: NotchTuning;
   /** Order = order in the tool bar. */
   tools: { id: string; enabled: boolean }[];
-  trading: { env: "live" | "demo" };
-  /** AI usage: which providers are shown (order = display order). */
-  usage: { claude: boolean; codex: boolean; gemini: boolean; cursor: boolean };
-  ask: { provider: AskProvider; configs: Record<AskProvider, AskProviderConfig> };
   /** `auto` = detected via IP (again on every start); a picked location stays. */
   weather: { name: string; lat: number; lon: number; auto?: boolean } | null;
   /**
@@ -31,14 +79,8 @@ export interface Settings {
     visibility: "always" | "hide-fullscreen";
     monitor: string | null;
     offset: number;
-    /** Focus mode look: half transparent (as before) or shrunk to a thin line at the edge. */
     focusStyle: "dim" | "line";
-    /**
-     * Closed look outside focus mode: the notch, or a thin line (no music etc.; only a
-     * finished timer opens it into the notch until dismissed). Hover and click work as usual.
-     */
     idleStyle: "notch" | "line";
-    /** Idle notch size in CSS px (Idle Appearance); the shape morphs there live. */
     idleW: number;
     idleH: number;
   };
@@ -46,35 +88,27 @@ export interface Settings {
   gaming: { mode: "off" | "fullscreen" | "on" };
   /** Dots like on iPhone: mic/camera (green) or screen recording (red) in use. */
   privacyDots: boolean;
-  /** Discord call in the notch (local RPC, on = Discord tool enabled). The client secret is stored with the secrets. */
+  /** Discord call in the notch (local RPC, on = Discord tool enabled). */
   discord: { clientId: string };
   alarm: { sound: AlarmSound; volume: number; duration: AlarmDuration };
   language: "de" | "en";
   /** Temperature and clock format; picked from the Windows region on first start. */
   units: { temp: "c" | "f"; clock: "24" | "12" };
-  /**
-   * Presentation mode: hides clipboard previews, balances and the vault while sharing
-   * the screen. `manual` = switched on by hand, `auto` = on while a recording is detected.
-   */
+  /** Presentation mode: hides sensitive content while sharing the screen. */
   presentation: { manual: boolean; auto: boolean };
   /** Check for a new version once a day, anonymously (installs only on click). */
   updates: { auto: boolean };
   /** Look of the notch: background effect, colours, shape and material. */
   appearance: {
     effect: AppearanceEffect;
-    /** Background effect also behind the closed notch (never the line look). */
     closedEffect: boolean;
-    /** Switches, highlights, effect base and glow when nothing plays. Always a fixed colour. */
     accent: string;
-    /** Colour of the collapsed notch. */
     resting: string;
-    /** Panel colour when the material is Solid. */
     expanded: string;
     corners: "rounded" | "squared";
     material: "glass" | "dark" | "solid";
     cards: "light" | "dark" | "darker";
     glow: "off" | "subtle" | "strong";
-    /** Brightness multipliers (1–2) for dock icons and dimmed sub text. */
     icons: number;
     subtext: number;
   };
@@ -82,43 +116,14 @@ export interface Settings {
 
 export type AppearanceEffect = "none" | "visualizer" | "ambient" | "waves" | "aurora" | "holographic" | "topographic" | "synthwave" | "nightsky";
 
-/** All tool IDs in default order. Must match `src/notch/tabs.ts`. */
-export const TOOL_IDS = [
-  "overview",
-  "media",
-  "timer",
-  "todos",
-  "notes",
-  "clipboard",
-  "shelf",
-  "ask",
-  "convert",
-  "trading",
-  "usage",
-  "weather",
-  "system",
-  "discord",
-  "vault",
-  "appearance",
-] as const;
-
-const DEFAULT_OFF = new Set<string>(["system", "discord", "trading", "vault"]);
+/** Active tool IDs in the clean-slate dock. Must match `src/notch/tabs.ts`. */
+export const TOOL_IDS = ["overview", "media"] as const;
 
 const defaults: Settings = {
   openMode: "hover",
   hoverDelay: "normal",
-  tools: TOOL_IDS.map((id) => ({ id, enabled: !DEFAULT_OFF.has(id) })),
-  trading: { env: "live" },
-  usage: { claude: true, codex: true, gemini: true, cursor: false },
-  ask: {
-    provider: "custom",
-    configs: {
-      openrouter: { model: "", effort: "medium", baseUrl: "" },
-      openai: { model: "", effort: "medium", baseUrl: "" },
-      anthropic: { model: "claude-opus-5-5", effort: "medium", baseUrl: "" },
-      custom: { model: "", effort: "medium", baseUrl: "" },
-    },
-  },
+  notch: { ...DEFAULT_NOTCH_TUNING },
+  tools: TOOL_IDS.map((id) => ({ id, enabled: true })),
   weather: null,
   display: { visibility: "always", monitor: null, offset: 0, focusStyle: "dim", idleStyle: "notch", idleW: 188, idleH: 30 },
   gaming: { mode: "off" },
@@ -132,7 +137,7 @@ const defaults: Settings = {
   appearance: {
     effect: "none",
     closedEffect: false,
-    accent: "#ff453a",
+    accent: "#4285f4",
     resting: "#000000",
     expanded: "#000000",
     corners: "rounded",
@@ -177,16 +182,16 @@ export function normalizeSettings(s: Settings): Settings {
   const tools = (s.tools ?? []).filter((t) => known.has(t.id));
   for (const id of TOOL_IDS) {
     if (tools.some((t) => t.id === id)) continue;
-    // Overview is the start page, so put it first for existing installs.
     if (id === "overview") tools.unshift({ id, enabled: true });
-    else tools.push({ id, enabled: !DEFAULT_OFF.has(id) });
+    else tools.push({ id, enabled: true });
   }
+  const notch: NotchTuning = { ...DEFAULT_NOTCH_TUNING, ...(s.notch ?? {}) };
   return {
     ...defaults,
     ...s,
+    openMode: notch.openMode,
+    notch,
     tools,
-    trading: { ...defaults.trading, ...s.trading },
-    usage: { ...defaults.usage, ...s.usage },
     display: { ...defaults.display, ...s.display },
     gaming: { ...defaults.gaming, ...s.gaming },
     discord: { ...defaults.discord, ...s.discord },
@@ -195,26 +200,26 @@ export function normalizeSettings(s: Settings): Settings {
     presentation: { ...defaults.presentation, ...s.presentation },
     updates: { ...defaults.updates, ...s.updates },
     appearance: { ...defaults.appearance, ...s.appearance },
-    ask: migrateAsk(s.ask),
   };
 }
 
 export const settings = createStore<Settings>(defaults, { persist: "settings", normalize: normalizeSettings });
 
-// Fill in settings from older versions: new fields + append new tools.
 settings.set(normalizeSettings);
 
-/** Migrates the old shape ({ provider: "demo", model }) and adds missing providers. */
-function migrateAsk(old: Partial<Settings["ask"]> | undefined): Settings["ask"] {
-  const known = Object.keys(defaults.ask.configs) as AskProvider[];
-  const provider = old?.provider && known.includes(old.provider) ? old.provider : defaults.ask.provider;
-  const configs = { ...defaults.ask.configs };
-  for (const p of known) configs[p] = { ...defaults.ask.configs[p], ...old?.configs?.[p] };
-  return { provider, configs };
+export function updateNotch(patch: Partial<NotchTuning>) {
+  settings.set((s) => {
+    const notch = { ...s.notch, ...patch };
+    return { ...s, openMode: notch.openMode, notch };
+  });
 }
 
-export function updateAsk(provider: AskProvider, patch: Partial<AskProviderConfig>) {
-  settings.set((s) => ({ ...s, ask: { ...s.ask, configs: { ...s.ask.configs, [provider]: { ...s.ask.configs[provider], ...patch } } } }));
+export function resetNotchTuning() {
+  settings.set((s) => ({
+    ...s,
+    openMode: DEFAULT_NOTCH_TUNING.openMode,
+    notch: { ...DEFAULT_NOTCH_TUNING },
+  }));
 }
 
 export function updateSettings(patch: Partial<Settings> | ((s: Settings) => Partial<Settings>)) {

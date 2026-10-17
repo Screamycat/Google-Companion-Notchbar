@@ -1,42 +1,57 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowClockwise, Bluetooth, BluetoothConnected, BluetoothSlash, CaretDown, DeviceMobile, Eye, EyeSlash, GearSix, Headphones, Keyboard, LockSimple, Moon, MoonStars, MouseSimple, MusicNoteSimple, SpeakerHigh, SpeakerLow, SpeakerNone, SpeakerSimpleSlash, SunDim, Timer } from "@phosphor-icons/react";
-import { DiscordLogo } from "../../ui/brands";
+import {
+  ArrowClockwise,
+  Bluetooth,
+  BluetoothConnected,
+  BluetoothSlash,
+  CaretDown,
+  DeviceMobile,
+  GearSix,
+  Headphones,
+  Keyboard,
+  LockSimple,
+  Moon,
+  MoonStars,
+  MouseSimple,
+  MusicNoteSimple,
+  SpeakerHigh,
+  SpeakerLow,
+  SpeakerNone,
+  SpeakerSimpleSlash,
+  SunDim,
+} from "@phosphor-icons/react";
 import { content, popover, springs } from "../../design/motion";
 import { HeaderActions, HeaderButton } from "../../notch/header";
 import { navigate } from "../../notch/nav";
-import { togglePresentation, usePresenting } from "../privacy/store";
 import { useNowPlaying } from "../../platform/media";
 import { bluetooth, systemControls, type BtState, type FocusState, type VolumeState } from "../../platform/services";
 import { hitExtra } from "../../platform/native";
-import { useDiscordCall } from "../discord/store";
 import { Equalizer } from "../now-playing/Equalizer";
 import { ARTWORK_LAYOUT_ID } from "../now-playing/NowPlayingView";
-import { formatClock, timer, useRemaining } from "../timer/store";
 import { describe, useForecast } from "../weather/store";
 import { settings } from "../../settings/store";
 import { formatTemp, formatTimeParts } from "../../lib/format";
+import { CompanionSlot } from "../companion/CompanionSlot";
 import { locale, t, tBackend } from "../../i18n";
 
-/*
- *   14:32                                    ☀ 18°
- *   Sunday, 5 October                Vienna · Clear
- *   ┌──────────────────────────────────────────────┐
- *   │ ▣ Song – Artist                        ▮▮▮▮  │   ← what's playing (click opens the tool)
- *   └──────────────────────────────────────────────┘
- *   [☾ Focus  ]  [🔊 ━━━━━━━━━━━━━━━━━━━━━━━  42 %]
+/**
+ * Modular 3-column Overview layout matching the design sketch:
  *
- * Like Control Center: an overview plus the two toggles you need all the time.
+ *   ┌───────────────┐       ╭─────────╮       ┌───────────────┐
+ *   │  Clock & Date │       │  ◠   ◠  │       │    Weather    │
+ *   │ ───────────── │       │    ◡    │       │ ───────────── │
+ *   │  🔊 Volume    │       ╰─────────╯       │  🎵 Now Play  │
+ *   │  ☀ Brightness │    Center Companion     │  ᛒ Bluetooth  │
+ *   └───────────────┘                         └───────────────┘
+ *
+ * Left and right widgets are modular so they can be rearranged at any time.
  */
 export function OverviewView() {
-  const presenting = usePresenting();
   return (
-    <div className="flex h-full flex-col gap-2.5 px-4 pt-1 pb-3">
+    <div className="flex h-full flex-col justify-between px-4 pt-1 pb-2">
       <HeaderActions>
-        <HeaderButton label={presenting ? t("Präsentationsmodus beenden") : t("Präsentationsmodus")} active={presenting} onClick={togglePresentation}>
-          {presenting ? <EyeSlash size={14} weight="fill" /> : <Eye size={14} weight="bold" />}
-        </HeaderButton>
         <HeaderButton label={t("Sperren")} onClick={() => void systemControls.lock()}>
           <LockSimple size={14} weight="bold" />
         </HeaderButton>
@@ -44,14 +59,36 @@ export function OverviewView() {
           <MoonStars size={14} weight="bold" />
         </HeaderButton>
       </HeaderActions>
-      <Header />
-      <Activity />
-      <div className="flex gap-2">
-        <FocusTile />
-        <VolumeTile />
-        <BrightnessTile />
+
+      <div className="grid h-full grid-cols-[1fr_auto_1fr] items-center gap-3.5">
+        {/* Left Modular Column */}
+        <div className="flex h-full min-w-0 flex-col justify-between gap-2 py-0.5">
+          <ClockWidget />
+          <div className="flex flex-col gap-2">
+            <VolumeTile />
+            <BrightnessTile />
+          </div>
+        </div>
+
+        {/* Center Companion Space */}
+        <div className="flex flex-col items-center justify-center px-1">
+          <CompanionSlot variant="overview" />
+        </div>
+
+        {/* Right Modular Column */}
+        <div className="flex h-full min-w-0 flex-col justify-between gap-2 py-0.5">
+          <WeatherWidget />
+          <div className="flex flex-col gap-2">
+            <NowPlayingMiniTile />
+            <div className="flex items-center gap-1.5">
+              <div className="min-w-0 flex-1">
+                <BluetoothTile />
+              </div>
+              <FocusButton />
+            </div>
+          </div>
+        </div>
       </div>
-      <BluetoothTile />
     </div>
   );
 }
@@ -65,82 +102,71 @@ function useNow(): Date {
   return now;
 }
 
-function Header() {
+function ClockWidget() {
   const now = useNow();
-  const forecast = useForecast();
-  const place = settings.use().weather;
-  const weather = forecast && forecast !== "error" ? describe(forecast.current.code, forecast.current.day) : null;
   const { time, period } = formatTimeParts(now);
-  const date = new Intl.DateTimeFormat(locale(), { weekday: "long", day: "numeric", month: "long" }).format(now);
+  const date = new Intl.DateTimeFormat(locale(), { weekday: "short", day: "numeric", month: "short" }).format(now);
 
   return (
-    <div className="flex items-end justify-between">
-      <div>
-        <div className="tabular text-[34px] leading-none font-semibold tracking-[-0.03em] text-label">
-          {time}
-          {period && <span className="ml-1 text-title font-semibold tracking-normal text-label-3">{period}</span>}
-        </div>
-        <div className="mt-1 text-footnote text-label-3">{date}</div>
+    <div className="flex flex-col justify-center rounded-[12px] bg-fill-1 px-3 py-2">
+      <div className="tabular text-[26px] leading-none font-semibold tracking-[-0.03em] text-label">
+        {time}
+        {period && <span className="ml-1 text-footnote font-semibold tracking-normal text-label-3">{period}</span>}
       </div>
-      <button onClick={() => navigate("weather")} className="pressable flex flex-col items-end text-right" title={t("Wetter öffnen")}>
-        <AnimatePresence mode="popLayout" initial={false}>
-          {weather && forecast && forecast !== "error" ? (
-            <motion.div
-              key="w"
-              className="flex items-center gap-1.5"
-              initial={{ opacity: 0, filter: "blur(4px)" }}
-              animate={{ opacity: 1, filter: "blur(0px)", transition: content.enter }}
-            >
-              <weather.icon size={22} weight="fill" className="text-label" />
-              <span className="tabular text-[22px] leading-none font-semibold tracking-[-0.02em] text-label">{formatTemp(forecast.current.temp)}</span>
-            </motion.div>
-          ) : (
-            <motion.div key="s" className="h-[22px] w-16 rounded-[6px] bg-fill-1" exit={{ opacity: 0, transition: content.exit }} />
-          )}
-        </AnimatePresence>
-        <div className="mt-1 max-w-[220px] truncate text-footnote text-label-3">
-          {place ? `${place.name}${weather ? ` · ${weather.text}` : ""}` : t("Ort wird erkannt …")}
-        </div>
-      </button>
+      <div className="mt-1 truncate text-caption text-label-3">{date}</div>
     </div>
   );
 }
 
-/** What's running, in the same priority as the closed notch: timer, call, music. */
-function Activity() {
-  const np = useNowPlaying();
-  const call = useDiscordCall();
-  const tm = timer.use();
-  const remaining = useRemaining();
-  const timerLive = tm.endsAt !== null || tm.finished;
+function WeatherWidget() {
+  const forecast = useForecast();
+  const place = settings.use().weather;
+  const weather = forecast && forecast !== "error" ? describe(forecast.current.code, forecast.current.day) : null;
 
-  let item: { key: string; tab: string; icon: ReactNode; title: string; detail: string; trailing?: ReactNode } | null = null;
-  if (timerLive) {
-    item = {
-      key: "timer",
-      tab: "timer",
-      icon: <Timer size={18} weight="bold" className={tm.mode === "focus" ? "text-orange" : "text-green"} />,
-      title: tm.finished ? t(tm.mode === "focus" ? "Fokus abgelaufen" : "Pause abgelaufen") : t(tm.mode === "focus" ? "Fokus" : "Pause"),
-      detail: tm.finished ? t("Zum Schließen öffnen") : t("noch {time}", { time: formatClock(remaining) }),
-    };
-  } else if (call) {
-    item = {
-      key: "discord",
-      tab: "discord",
-      icon: <DiscordLogo size={18} weight="fill" className="text-label" />,
-      title: call.channelName,
-      detail: [call.guildName, t(call.members.length === 1 ? "{n} Person" : "{n} Personen", { n: call.members.length })].filter(Boolean).join(" · "),
-      trailing: <Equalizer playing={call.members.some((m) => m.speaking)} tint="bg-green" />,
-    };
-  } else if (np) {
+  return (
+    <div className="flex flex-col items-end justify-center rounded-[12px] bg-fill-1 px-3 py-2 text-right">
+      <AnimatePresence mode="popLayout" initial={false}>
+        {weather && forecast && forecast !== "error" ? (
+          <motion.div
+            key="w"
+            className="flex items-center gap-1.5"
+            initial={{ opacity: 0, filter: "blur(4px)" }}
+            animate={{ opacity: 1, filter: "blur(0px)", transition: content.enter }}
+          >
+            <weather.icon size={20} weight="fill" className="text-label" />
+            <span className="tabular text-[22px] leading-none font-semibold tracking-[-0.02em] text-label">
+              {formatTemp(forecast.current.temp)}
+            </span>
+          </motion.div>
+        ) : (
+          <motion.div key="s" className="h-[22px] w-16 rounded-[6px] bg-fill-2" exit={{ opacity: 0, transition: content.exit }} />
+        )}
+      </AnimatePresence>
+      <div className="mt-1 max-w-full truncate text-caption text-label-3">
+        {place ? `${place.name}${weather ? ` · ${weather.text}` : ""}` : t("Ort wird erkannt …")}
+      </div>
+    </div>
+  );
+}
+
+function NowPlayingMiniTile() {
+  const np = useNowPlaying();
+
+  let item: { key: string; icon: ReactNode; title: string; detail: string; trailing?: ReactNode } | null = null;
+  if (np) {
     item = {
       key: "media",
-      tab: "media",
       icon: np.artwork ? (
-        // Same layoutId as the cover in Now Playing, so a click flies it there.
-        <motion.img layoutId={ARTWORK_LAYOUT_ID} transition={springs.morph} src={np.artwork} alt="" draggable={false} className="size-7 rounded-[6px] object-cover" />
+        <motion.img
+          layoutId={ARTWORK_LAYOUT_ID}
+          transition={springs.morph}
+          src={np.artwork}
+          alt=""
+          draggable={false}
+          className="size-6 rounded-[6px] object-cover"
+        />
       ) : (
-        <MusicNoteSimple size={18} weight="fill" className="text-label-2" />
+        <MusicNoteSimple size={16} weight="fill" className="text-label-2" />
       ),
       title: np.title,
       detail: np.artist,
@@ -149,47 +175,47 @@ function Activity() {
   }
 
   return (
-    <div className="relative h-11 overflow-hidden rounded-[12px] bg-fill-1">
+    <div className="relative h-9 overflow-hidden rounded-[12px] bg-fill-1">
       <AnimatePresence mode="popLayout" initial={false}>
         {item ? (
           <motion.button
             key={item.key}
-            onClick={() => navigate(item.tab)}
-            className="pressable pressable-wide pressable-fill absolute inset-0 flex items-center gap-2.5 px-2.5 text-left"
+            onClick={() => navigate("media")}
+            className="pressable pressable-wide pressable-fill absolute inset-0 flex items-center gap-2 px-2.5 text-left"
             initial={{ opacity: 0, filter: "blur(4px)" }}
             animate={{ opacity: 1, filter: "blur(0px)", transition: content.enter }}
             exit={{ opacity: 0, filter: "blur(4px)", transition: content.exit }}
           >
-            <span className="flex size-7 shrink-0 items-center justify-center">{item.icon}</span>
+            <span className="flex size-6 shrink-0 items-center justify-center">{item.icon}</span>
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-footnote font-medium text-label">{item.title}</span>
-              <span className="block truncate text-caption text-label-3">{item.detail}</span>
+              <span className="block truncate text-caption font-medium text-label">{item.title}</span>
+              <span className="block truncate text-[10px] leading-tight text-label-3">{item.detail}</span>
             </span>
-            {item.trailing && <span className="shrink-0 pr-1">{item.trailing}</span>}
+            {item.trailing && <span className="shrink-0 pr-0.5">{item.trailing}</span>}
           </motion.button>
         ) : (
-          <motion.div
+          <motion.button
             key="idle"
-            className="absolute inset-0 flex items-center justify-center text-footnote text-label-3"
+            onClick={() => navigate("media")}
+            className="pressable absolute inset-0 flex items-center justify-center gap-1.5 text-caption text-label-3 hover:text-label-2"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1, transition: content.enter }}
             exit={{ opacity: 0, transition: content.exit }}
           >
-            {t("Gerade läuft nichts")}
-          </motion.div>
+            <MusicNoteSimple size={13} weight="bold" />
+            <span className="truncate">{t("Gerade läuft nichts")}</span>
+          </motion.button>
         )}
       </AnimatePresence>
     </div>
   );
 }
 
-/** Windows focus on/off. Light = on (like Control Center). */
-function FocusTile() {
+function FocusButton() {
   const [focus, setFocus] = useState<FocusState | null>(null);
   useEffect(() => {
     const load = () => void systemControls.focus().then(setFocus).catch(() => setFocus(null));
     load();
-    // Also toggled elsewhere (taskbar, Clock app) → follow it.
     const id = setInterval(load, 2000);
     return () => clearInterval(id);
   }, []);
@@ -199,31 +225,21 @@ function FocusTile() {
   return (
     <button
       aria-pressed={active}
+      title={label}
       disabled={!focus}
       onClick={() => {
         setFocus((f) => f && { ...f, active: !active });
         void systemControls.setFocus(!active).then(setFocus).catch(() => systemControls.focus().then(setFocus));
       }}
-      className={`pressable flex h-10 w-[150px] shrink-0 items-center gap-2.5 rounded-[12px] px-2.5 transition-colors duration-200 disabled:opacity-40 ${
-        active ? "bg-label text-black" : "bg-fill-1 text-label"
+      className={`pressable flex size-9 shrink-0 items-center justify-center rounded-[12px] transition-colors duration-200 disabled:opacity-40 ${
+        active ? "bg-label text-black" : "bg-fill-1 text-label-2 hover:text-label"
       }`}
     >
-      <motion.span
-        className={`flex size-6 items-center justify-center rounded-full ${active ? "bg-black/10" : "bg-fill-2"}`}
-        animate={{ rotate: active ? 0 : -30 }}
-        transition={springs.snappy}
-      >
-        <Moon size={14} weight="fill" />
-      </motion.span>
-      <span className="min-w-0 text-left">
-        <span className="block truncate text-footnote font-semibold">{label}</span>
-        <span className={`block text-caption ${active ? "text-black/55" : "text-label-3"}`}>{active ? t("An") : t("Aus")}</span>
-      </span>
+      <Moon size={15} weight="fill" />
     </button>
   );
 }
 
-/** Thick volume slider like Control Center: drag anywhere, icon = mute. */
 function VolumeTile() {
   const [vol, setVol] = useState<VolumeState | null>(null);
   const dragging = useRef(false);
@@ -232,7 +248,6 @@ function VolumeTile() {
   useEffect(() => {
     const load = () => !dragging.current && void systemControls.volume().then(setVol).catch(() => {});
     load();
-    // Keyboard volume keys or taskbar → follow them.
     const id = setInterval(load, 1000);
     return () => clearInterval(id);
   }, []);
@@ -247,14 +262,14 @@ function VolumeTile() {
   const Icon = vol?.muted || level === 0 ? SpeakerSimpleSlash : level < 0.34 ? SpeakerNone : level < 0.67 ? SpeakerLow : SpeakerHigh;
 
   return (
-    <div className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-[12px] bg-fill-1 pr-3 pl-1.5">
+    <div className="flex h-9 min-w-0 items-center gap-1.5 rounded-[12px] bg-fill-1 pr-2.5 pl-1.5">
       <button
         aria-label={vol?.muted ? t("Stummschaltung aufheben") : t("Stumm")}
         disabled={!vol}
         onClick={() => vol && void systemControls.setVolume({ muted: !vol.muted }).then(setVol)}
-        className={`pressable flex size-7 shrink-0 items-center justify-center rounded-full ${vol?.muted ? "text-red" : "text-label-2 hover:text-label"}`}
+        className={`pressable flex size-6 shrink-0 items-center justify-center rounded-full ${vol?.muted ? "text-red" : "text-label-2 hover:text-label"}`}
       >
-        <Icon size={15} weight="fill" />
+        <Icon size={14} weight="fill" />
       </button>
       <div
         ref={track}
@@ -264,7 +279,7 @@ function VolumeTile() {
         aria-valuenow={Math.round(level * 100)}
         aria-valuemin={0}
         aria-valuemax={100}
-        className="relative h-6 min-w-0 flex-1 cursor-pointer touch-none overflow-hidden rounded-full bg-fill-2 outline-none"
+        className="relative h-5 min-w-0 flex-1 cursor-pointer touch-none overflow-hidden rounded-full bg-fill-2 outline-none"
         onPointerDown={(e) => {
           if (!vol) return;
           dragging.current = true;
@@ -280,12 +295,6 @@ function VolumeTile() {
           setVol({ level: l, muted: false });
           void systemControls.setVolume({ level: l });
         }}
-        onKeyDown={(e) => {
-          if (!vol || (e.key !== "ArrowRight" && e.key !== "ArrowLeft")) return;
-          const l = Math.min(1, Math.max(0, level + (e.key === "ArrowRight" ? 0.05 : -0.05)));
-          setVol({ level: l, muted: false });
-          void systemControls.setVolume({ level: l });
-        }}
       >
         <motion.div
           className="absolute inset-0 origin-left rounded-full bg-label"
@@ -294,12 +303,11 @@ function VolumeTile() {
           transition={dragging.current ? { duration: 0 } : springs.snappy}
         />
       </div>
-      <span className="tabular w-8 shrink-0 text-right text-caption font-semibold text-label-2">{vol ? Math.round(level * 100) : "–"}</span>
+      <span className="tabular w-7 shrink-0 text-right text-caption font-semibold text-label-2">{vol ? Math.round(level * 100) : "–"}</span>
     </div>
   );
 }
 
-/** Screen brightness slider (power scheme), same mounted-only polling as volume. */
 function BrightnessTile() {
   const [level, setLevel] = useState<number | null>(null);
   const dragging = useRef(false);
@@ -308,7 +316,6 @@ function BrightnessTile() {
   useEffect(() => {
     const load = () => !dragging.current && void systemControls.brightness().then((b) => setLevel(b.level)).catch(() => {});
     load();
-    // Brightness keys or Settings → follow them.
     const id = setInterval(load, 1000);
     return () => clearInterval(id);
   }, []);
@@ -321,9 +328,9 @@ function BrightnessTile() {
   };
 
   return (
-    <div className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-[12px] bg-fill-1 pr-3 pl-1.5">
-      <span className="flex size-7 shrink-0 items-center justify-center text-label-2">
-        <SunDim size={15} weight="fill" />
+    <div className="flex h-9 min-w-0 items-center gap-1.5 rounded-[12px] bg-fill-1 pr-2.5 pl-1.5">
+      <span className="flex size-6 shrink-0 items-center justify-center text-label-2">
+        <SunDim size={14} weight="fill" />
       </span>
       <div
         ref={track}
@@ -333,7 +340,7 @@ function BrightnessTile() {
         aria-valuenow={level === null ? undefined : Math.round(level * 100)}
         aria-valuemin={0}
         aria-valuemax={100}
-        className="relative h-6 min-w-0 flex-1 cursor-pointer touch-none overflow-hidden rounded-full bg-fill-2 outline-none"
+        className="relative h-5 min-w-0 flex-1 cursor-pointer touch-none overflow-hidden rounded-full bg-fill-2 outline-none"
         onPointerDown={(e) => {
           if (level === null) return;
           dragging.current = true;
@@ -343,12 +350,6 @@ function BrightnessTile() {
         onPointerMove={(e) => e.currentTarget.hasPointerCapture(e.pointerId) && set(e.clientX)}
         onPointerUp={() => (dragging.current = false)}
         onPointerCancel={() => (dragging.current = false)}
-        onKeyDown={(e) => {
-          if (level === null || (e.key !== "ArrowRight" && e.key !== "ArrowLeft")) return;
-          const l = Math.min(1, Math.max(0, level + (e.key === "ArrowRight" ? 0.05 : -0.05)));
-          setLevel(l);
-          void systemControls.setBrightness(l).then((b) => setLevel(b.level));
-        }}
       >
         <motion.div
           className="absolute inset-0 origin-left rounded-full bg-label"
@@ -357,12 +358,11 @@ function BrightnessTile() {
           transition={dragging.current ? { duration: 0 } : springs.snappy}
         />
       </div>
-      <span className="tabular w-8 shrink-0 text-right text-caption font-semibold text-label-2">{level === null ? "–" : Math.round(level * 100)}</span>
+      <span className="tabular w-7 shrink-0 text-right text-caption font-semibold text-label-2">{level === null ? "–" : Math.round(level * 100)}</span>
     </div>
   );
 }
 
-/** Device icon from the Bluetooth class-of-device (major class = bits 8–12). */
 function BtIcon({ cod }: { cod: number }) {
   const major = (cod >> 8) & 0x1f;
   if (major === 0x04) return <Headphones size={16} weight="fill" />;
@@ -371,8 +371,6 @@ function BtIcon({ cod }: { cod: number }) {
   return <Bluetooth size={16} weight="bold" />;
 }
 
-/** Bluetooth tile + paired-device dropdown. On demand only: lists once on
- *  mount and every 5 s while the panel is open, never in the background. */
 function BluetoothTile() {
   const [open, setOpen] = useState(false);
   const [state, setState] = useState<BtState | null>(null);
@@ -404,7 +402,7 @@ function BluetoothTile() {
       alive = false;
       clearInterval(id);
     };
-  }, [open ]);
+  }, [open]);
 
   useLayoutEffect(() => {
     if (!open) return;
@@ -414,16 +412,12 @@ function BluetoothTile() {
       Math.min(ref.current?.closest("[data-notch-hit]")?.getBoundingClientRect().bottom ?? window.innerHeight, window.innerHeight) - 8;
     setPos({
       left: trigger.left,
-      width: trigger.width,
+      width: Math.max(200, trigger.width),
       top: trigger.bottom + 6,
       maxHeight: Math.max(120, Math.min(264, maxY - trigger.bottom - 6)),
     });
-  }, [open ]);
+  }, [open]);
 
-  // The panel hangs below the notch shape: union it into the Rust hit rect
-  // (see useNativeBridge), or the cursor leaving the shape makes the window
-  // click-through and the notch auto-close. A few px of margin cover the
-  // enter animation and sub-pixel edges.
   useLayoutEffect(() => {
     if (!open || !pos) {
       hitExtra.set(null);
@@ -436,9 +430,8 @@ function BluetoothTile() {
         : { x: pos.left, y: pos.top, w: pos.width, h: pos.maxHeight };
     hitExtra.set({ x: r.x - 4, y: r.y - 4, w: r.w + 8, h: r.h + 8 });
     return () => void hitExtra.set(null);
-  }, [open, pos, state ]);
+  }, [open, pos, state]);
 
-  // Same dismissal as the Select in ui/controls.tsx: outside click, resize.
   useEffect(() => {
     if (!open) return;
     const onDown = (e: PointerEvent) => {
@@ -452,20 +445,15 @@ function BluetoothTile() {
       window.removeEventListener("pointerdown", onDown);
       window.removeEventListener("resize", close);
     };
-  }, [open ]);
+  }, [open]);
 
   const host = ref.current?.closest("[data-notch-hit]") ?? document.body;
   const devices = state?.devices ?? [];
   const connected = devices.find((d) => d.connected);
 
-  // The panel unmounts when the notch closes: stop the settle loop then
-  // instead of polling in the background.
   const alive = useRef(true);
   useEffect(() => () => void (alive.current = false), []);
 
-  // Connecting takes a moment (service call + radio + headset); A2DP can lag
-  // several more seconds behind the call. Poll until the device reports
-  // connected and never flash the feedback for less than a moment.
   const connect = (address: number) => {
     if (connecting !== null) return;
     const started = Date.now();
@@ -498,6 +486,7 @@ function BluetoothTile() {
       }
     })();
   };
+
   const sub =
     state === null
       ? "–"
@@ -514,23 +503,22 @@ function BluetoothTile() {
       <button
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
-        className="pressable flex h-10 w-full items-center gap-2.5 rounded-[12px] bg-fill-1 px-2.5 text-left"
+        className="pressable flex h-9 w-full items-center gap-2 rounded-[12px] bg-fill-1 px-2.5 text-left"
       >
-        <span className="flex size-6 items-center justify-center rounded-full bg-fill-2 text-label-2">
+        <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-fill-2 text-label-2">
           {state && !state.radio ? (
-            <BluetoothSlash size={14} weight="bold" />
+            <BluetoothSlash size={12} weight="bold" />
           ) : connected ? (
-            <BluetoothConnected size={14} weight="fill" />
+            <BluetoothConnected size={12} weight="fill" />
           ) : (
-            <Bluetooth size={14} weight="bold" />
+            <Bluetooth size={12} weight="bold" />
           )}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-footnote font-semibold text-label">{t("Bluetooth")}</span>
-          <span className="block truncate text-caption text-label-3">{sub}</span>
+          <span className="block truncate text-caption font-semibold text-label">{ sub }</span>
         </span>
         <motion.span animate={{ rotate: open ? 180 : 0 }} transition={springs.snappy} className="text-label-3">
-          <CaretDown size={13} weight="bold" />
+          <CaretDown size={11} weight="bold" />
         </motion.span>
       </button>
       {createPortal(

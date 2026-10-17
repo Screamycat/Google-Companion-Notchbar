@@ -1,4 +1,3 @@
-pub mod ai;
 mod audio;
 mod bluetooth;
 mod clipboard;
@@ -17,9 +16,6 @@ mod ocr;
 mod privacy;
 pub mod secrets;
 mod system;
-mod trading;
-pub mod usage;
-mod vault;
 mod config;
 
 use std::sync::Mutex;
@@ -67,13 +63,9 @@ pub fn run() {
         .manage(FocusState::default())
         .manage(TrayItems::default())
         .manage(audio::AudioState::default())
-        .manage(ai::AiState::default())
-        .manage(trading::TradingState::default())
-        .manage(usage::UsageState::default())
         .manage(system::SystemState::default())
         .manage(display::DisplayState::default())
         .manage(discord::DiscordState::default())
-        .manage(vault::VaultState::default())
         .invoke_handler(tauri::generate_handler![
             hit_test::set_hit_rect,
             hit_test::set_pinned,
@@ -91,13 +83,9 @@ pub fn run() {
             clipboard::clipboard_ocr,
             keyboard_focus,
             audio::audio_levels,
-            ai::ai_chat,
-            ai::ai_cancel,
             secrets::secret_set,
             secrets::secret_delete,
             secrets::secret_has,
-            trading::trading_fetch,
-            usage::usage_fetch,
             system::system_stats,
             convert::convert_probe,
             convert::convert_files,
@@ -129,24 +117,6 @@ pub fn run() {
             discord::discord_configure,
             discord::discord_action,
             discord::discord_state,
-            vault::vault_status,
-            vault::vault_setup,
-            vault::vault_unlock,
-            vault::vault_lock,
-            vault::vault_save_password,
-            vault::vault_add_totp,
-            vault::vault_delete,
-            vault::vault_reveal,
-            vault::vault_copy,
-            vault::vault_codes,
-            vault::vault_options,
-            vault::vault_change_pin,
-            vault::vault_reset,
-            vault::vault_scan,
-            vault::vault_hello_supported,
-            vault::vault_hello_unlock,
-            vault::vault_hello_enable,
-            vault::vault_hello_disable,
             set_language,
             autostart_get,
             autostart_set,

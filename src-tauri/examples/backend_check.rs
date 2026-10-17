@@ -1,11 +1,6 @@
 //! Backend check without UI: cargo run --example backend_check -- <scratch-dir>
 fn main() {
     let dir = std::env::args().nth(1).expect("pass a scratch directory");
-    let rt = tauri::async_runtime::block_on(notch_lib::usage::probe_for_test());
-    // Only print window counts or error codes, never account data.
-    for (id, result) in rt {
-        println!("usage {id}: {result:?}");
-    }
 
     let png = format!("{dir}/test.png");
     image::RgbaImage::from_fn(64, 48, |x, y| image::Rgba([x as u8 * 4, y as u8 * 5, 120, if x < 10 { 0 } else { 255 }]))

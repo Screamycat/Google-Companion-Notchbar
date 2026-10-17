@@ -30,36 +30,6 @@ export const showcaseTracks = [
 /** Where the first track starts (seconds). */
 export const showcaseStartPosition = 72;
 
-// ---------- Trading 212 ----------
-
-/*
- * A plausible depot. Values in EUR; US stocks converted at 1.17 USD/EUR.
- *   VWCE  72 × €138.40            avg €112.35
- *   NVDA  38 × $183.20            avg $121.50
- *   MSFT   9 × $512.30            avg $428.00
- *   AAPL  16 × $246.80            avg $229.40
- *   ASML   4 × €712.60            avg €748.10
- * Positions €26,081.10 + cash €612.45 = €26,693.55. Today +€312.40 (+1.18 %).
- */
-const usd = (v: number) => Math.round((v / 1.17) * 100) / 100;
-const position = (ticker: string, name: string, quantity: number, averagePrice: number, currentPrice: number, priceCurrency: "EUR" | "USD") => {
-  const conv = priceCurrency === "USD" ? usd : (v: number) => Math.round(v * 100) / 100;
-  const value = conv(quantity * currentPrice);
-  const cost = conv(quantity * averagePrice);
-  return { ticker, name, quantity, averagePrice, currentPrice, priceCurrency, value, cost, pnl: Math.round((value - cost) * 100) / 100 };
-};
-
-export const showcasePositions = [
-  position("VWCE", "Vanguard FTSE All-World (Acc)", 72, 112.35, 138.4, "EUR"),
-  position("NVDA", "NVIDIA", 38, 121.5, 183.2, "USD"),
-  position("MSFT", "Microsoft", 9, 428.0, 512.3, "USD"),
-  position("AAPL", "Apple", 16, 229.4, 246.8, "USD"),
-  position("ASML", "ASML Holding", 4, 748.1, 712.6, "EUR"),
-];
-export const showcaseCash = 612.45;
-export const showcaseRealized = 418.2;
-export const showcaseDayChange = 312.4;
-
 // ---------- Discord ----------
 
 export const showcaseCall = {
@@ -105,7 +75,7 @@ function photo(w: number, h: number): string {
 /** Ages in ms (relative to page load). */
 export const showcaseClips = [
   { id: 1, kind: "image" as const, text: "4032 × 3024", thumbnail: photo(4032, 3024), folders: 0, age: 8_000 },
-  { id: 2, kind: "link" as const, text: "https://github.com/Linux5Real/L4-Windows-NotchBar", thumbnail: null, folders: 0, age: 130_000 },
+  { id: 2, kind: "link" as const, text: "https://github.com/Screamycat/Google-NotchBar", thumbnail: null, folders: 0, age: 130_000 },
   { id: 3, kind: "text" as const, text: "export const open = spring(0.42, 0.24);", thumbnail: null, folders: 0, age: 380_000 },
   { id: 4, kind: "text" as const, text: "Rijksmuseum, Museumstraat 1, 1071 XX Amsterdam", thumbnail: null, folders: 0, age: 1_100_000 },
   { id: 5, kind: "files" as const, text: "Q3-Report.pdf\nBudget-2027.xlsx", thumbnail: null, folders: 0, age: 2_500_000 },
@@ -120,10 +90,3 @@ export const showcaseFileSizes: Record<string, number> = {
   "hero-banner.png": 3_204_000,
   "app-icon.png": 421_000,
 };
-
-// ---------- Ask ----------
-
-export const showcaseAnswer =
-  "Usually 3–6 GB. Chrome gives each site its own process: a light tab (articles, docs) needs about 50–150 MB, " +
-  "heavy apps like Gmail, YouTube or Figma 300 MB to 1 GB each.\n\n" +
-  "With 16 GB you're fine. On 8 GB, turn on Memory Saver (Settings → Performance) so inactive tabs go to sleep.";

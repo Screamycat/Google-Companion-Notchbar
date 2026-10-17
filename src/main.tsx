@@ -39,11 +39,11 @@ const syncDisplay = () => {
 syncDisplay();
 settings.subscribe(syncDisplay);
 
-// Clipboard history only records what an enabled tool uses (Ask: the latest text).
+// Clipboard history only records when the clipboard tool is enabled.
 let lastClipMode = "";
 const syncClipboardMode = () => {
   const on = (id: string) => settings.get().tools.some((t) => t.id === id && t.enabled);
-  const mode = on("clipboard") ? "all" : on("ask") ? "text" : "off";
+  const mode = on("clipboard") ? "all" : "off";
   if (mode === lastClipMode) return;
   lastClipMode = mode;
   clipboard.mode(mode);

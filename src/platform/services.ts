@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { isNative } from "./native";
 import bundledChangelog from "../changelog.json";
-import { showcase, showcaseCall, showcaseCash, showcaseDayChange, showcaseFileSizes, showcasePositions, showcaseRealized } from "../dev/showcase-data";
+import { showcase, showcaseCall, showcaseFileSizes } from "../dev/showcase-data";
 
 /*
  * Bridges to the Rust services (src-tauri/src/*.rs). In the browser they return
@@ -11,7 +11,7 @@ import { showcase, showcaseCall, showcaseCash, showcaseDayChange, showcaseFileSi
 
 // ---------- Secrets (Credential Manager) ----------
 
-export type SecretName = "t212.key" | "t212.secret" | "ai.anthropic" | "ai.openai" | "ai.openrouter" | "ai.custom" | "discord.secret";
+export type SecretName = "discord.secret" | "discord.token";
 
 const mockSecrets = new Map<SecretName, string>();
 
@@ -25,174 +25,6 @@ export const secrets = {
     return Promise.resolve();
   },
 };
-
-// ---------- Trading 212 ----------
-
-export interface Position {
-  ticker: string;
-  name: string;
-  quantity: number;
-  averagePrice: number;
-  currentPrice: number;
-  priceCurrency: string;
-  value: number;
-  cost: number;
-  pnl: number;
-}
-
-export interface Snapshot {
-  date: string;
-  /** Account value including cash. */
-  value: number;
-  invested: number;
-  /** Total profit; change vs. yesterday = daily change (excluding deposits/purchases). */
-  pnl: number;
-}
-
-export interface TradingData {
-  currency: string;
-  totalValue: number;
-  cash: number;
-  invested: number;
-  currentValue: number;
-  unrealized: number;
-  realized: number;
-  positions: Position[];
-  history: Snapshot[];
-  /** Today's data points (every ~2 min while the portfolio was open). */
-  intraday: { t: number; value: number; pnl: number }[];
-}
-
-/** Error codes from Rust: no-key, unauthorized, forbidden, rate, network:… */
-export function fetchTrading(env: "live" | "demo"): Promise<TradingData> {
-  const today = localDate(new Date());
-  return isNative ? invoke<TradingData>("trading_fetch", { env, today }) : mockTrading();
-}
-
-export function localDate(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-async function mockTrading(): Promise<TradingData> {
-  await new Promise((r) => setTimeout(r, showcase ? 160 : 450));
-  if (!mockSecrets.has("t212.key")) throw "no-key";
-  if (showcase) return showcaseTrading();
-  const positions: Position[] = [
-    { ticker: "NVDA", name: "NVIDIA", quantity: 12, averagePrice: 98.4, currentPrice: 141.2, priceCurrency: "USD", value: 1458.3, cost: 1012.6, pnl: 445.7 },
-    { ticker: "VUSA", name: "Vanguard S&P 500", quantity: 30, averagePrice: 88.1, currentPrice: 104.6, priceCurrency: "EUR", value: 3138.0, cost: 2643.0, pnl: 495.0 },
-    { ticker: "AAPL", name: "Apple", quantity: 6, averagePrice: 212.5, currentPrice: 204.9, priceCurrency: "USD", value: 1060.8, cost: 1100.1, pnl: -39.3 },
-    { ticker: "ASML", name: "ASML Holding", quantity: 1.5, averagePrice: 690.0, currentPrice: 655.2, priceCurrency: "EUR", value: 982.8, cost: 1035.0, pnl: -52.2 },
-    { ticker: "MSFT", name: "Microsoft", quantity: 2, averagePrice: 380.0, currentPrice: 431.5, priceCurrency: "USD", value: 742.4, cost: 655.8, pnl: 86.6 },
-  ];
-  const currentValue = positions.reduce((s, p) => s + p.value, 0);
-  const invested = positions.reduce((s, p) => s + p.cost, 0);
-  const cash = 412.35;
-  const realized = 128.4;
-  const pnlNow = currentValue - invested + realized;
-  const history: Snapshot[] = [];
-  let pnl = pnlNow - 260;
-  for (let i = 13; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    pnl = i === 0 ? pnlNow : pnl + Math.sin(i * 1.7) * 55 + 18;
-    history.push({ date: localDate(d), value: invested + cash + pnl - realized, invested, pnl });
-  }
-  // Intraday from 9:00 every 2 min, ending at the current value.
-  const start = new Date();
-  start.setHours(9, 0, 0, 0);
-  const steps = Math.max(2, Math.floor((Date.now() - start.getTime()) / 120_000));
-  const yesterday = history.at(-2)!.pnl;
-  const intraday = Array.from({ length: steps }, (_, i) => {
-    const f = i / (steps - 1);
-    const p = yesterday + (pnlNow - yesterday) * f + Math.sin(i * 0.09) * 18 * (1 - f) + Math.sin(i * 0.31) * 3;
-    return { t: start.getTime() + i * 120_000, value: invested + cash + p - realized, pnl: i === steps - 1 ? pnlNow : p };
-  });
-  return { currency: "EUR", totalValue: currentValue + cash, cash, invested, currentValue, unrealized: currentValue - invested, realized, positions, history, intraday };
-}
-
-/** Showcase: 30 days of steady growth, today exactly +showcaseDayChange. */
-function showcaseTrading(): TradingData {
-  const positions: Position[] = showcasePositions;
-  const currentValue = Math.round(positions.reduce((s, p) => s + p.value, 0) * 100) / 100;
-  const invested = Math.round(positions.reduce((s, p) => s + p.cost, 0) * 100) / 100;
-  const cash = showcaseCash;
-  const realized = showcaseRealized;
-  const pnlNow = currentValue - invested + realized;
-  const yesterday = pnlNow - showcaseDayChange;
-  const history: Snapshot[] = [];
-  for (let i = 30; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const f = (30 - i) / 30;
-    // Rising trend with a dip in the middle; the last two points are fixed.
-    const pnl = i === 0 ? pnlNow : i === 1 ? yesterday : yesterday - 1450 * (1 - f) + Math.sin(i * 0.9) * 120 - Math.max(0, 1 - Math.abs(i - 14) / 5) * 380;
-    history.push({ date: localDate(d), value: invested + cash + pnl - realized, invested, pnl });
-  }
-  const start = new Date();
-  start.setHours(9, 0, 0, 0);
-  const steps = Math.max(2, Math.floor((Date.now() - start.getTime()) / 120_000));
-  const intraday = Array.from({ length: steps }, (_, i) => {
-    const f = i / (steps - 1);
-    const p = i === steps - 1 ? pnlNow : yesterday + showcaseDayChange * f + Math.sin(i * 0.8) * 46 * (1 - f) - Math.sin(f * Math.PI) * 60;
-    return { t: start.getTime() + i * 120_000, value: invested + cash + p - realized, pnl: p };
-  });
-  return { currency: "EUR", totalValue: currentValue + cash, cash, invested, currentValue, unrealized: currentValue - invested, realized, positions, history, intraday };
-}
-
-// ---------- AI usage ----------
-
-export type UsageId = "claude" | "codex" | "gemini" | "cursor";
-
-export interface UsageWindow {
-  /** session | weekly | weekly-opus | weekly-sonnet | daily | monthly | model:<Name> */
-  kind: string;
-  usedPercent: number;
-  resetsAt: number | null;
-  /** Window length in seconds (for the "on track" marker). */
-  windowSecs: number | null;
-}
-
-export interface UsageProvider {
-  id: UsageId;
-  plan: string | null;
-  windows: UsageWindow[];
-  /** not-found | not-signed-in | expired | rate-limited | offline | failed (with data: stale). */
-  error: string | null;
-  updatedAt: number;
-}
-
-export function fetchUsage(providers: string[]): Promise<UsageProvider[]> {
-  if (isNative) return invoke<UsageProvider[]>("usage_fetch", { providers });
-  const now = Date.now();
-  const h = 3600_000;
-  const d = 86_400_000;
-  const all: UsageProvider[] = [
-    {
-      id: "claude",
-      plan: "Max",
-      windows: [
-        { kind: "session", usedPercent: 44, resetsAt: now + 2.4 * h, windowSecs: 5 * 3600 },
-        { kind: "weekly", usedPercent: 61, resetsAt: now + 3.1 * d, windowSecs: 7 * 86_400 },
-        { kind: "weekly-opus", usedPercent: 18, resetsAt: now + 3.1 * d, windowSecs: 7 * 86_400 },
-      ],
-      error: null,
-      updatedAt: now,
-    },
-    {
-      id: "codex",
-      plan: "Plus",
-      windows: [
-        { kind: "session", usedPercent: 71, resetsAt: now + 0.8 * h, windowSecs: 5 * 3600 },
-        { kind: "weekly", usedPercent: 23, resetsAt: now + 5.2 * d, windowSecs: 7 * 86_400 },
-      ],
-      error: null,
-      updatedAt: now - 4 * 60_000,
-    },
-    { id: "gemini", plan: null, windows: [], error: "not-found", updatedAt: now },
-    { id: "cursor", plan: null, windows: [], error: "not-found", updatedAt: now },
-  ];
-  return new Promise((r) => setTimeout(() => r(all.filter((p) => providers.includes(p.id))), 350));
-}
 
 // ---------- System ----------
 
