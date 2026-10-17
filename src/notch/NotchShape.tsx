@@ -32,13 +32,19 @@ export function NotchShape({ geometry, transition, elevated, tone, children }: P
   const ear = useMotionValue(geometry.ear);
   const shadow = useMotionValue(elevated ? 1 : 0);
 
-  // Smoothly morph into an ellipse / circle in the last stage of closing
-  // so the island tucks away as a fluid droplet instead of a flat wide bar.
+  // Threshold height where the shape begins its final morph into a circle.
+  // 16px ensures it stays a full-width rounded rectangle for ~90% of the closing animation,
+  // and only pulls into a smooth circle/dome in the very last few milliseconds.
+  const MORPH_THRESHOLD = 16;
+
+  // Smoothly morph into an ellipse / circle only in the final milliseconds of closing (h < 16px)
+  // so the island stays a full-width rounded rectangle for almost the entire animation,
+  // and only rounds its sides into a circle right before tucking into the bezel.
   const effectiveW = useTransform([w, h], (values: number[]) => {
     const [curW = 0, curH = 0] = values;
     if (curH <= 0.5) return 0;
-    if (curH < 52) {
-      const progress = curH / 52;
+    if (curH < MORPH_THRESHOLD) {
+      const progress = curH / MORPH_THRESHOLD; // 1 at 16px, 0 at 0px
       const blend = progress * progress;
       const circleW = curH * 2;
       const maxAllowedW = circleW + (curW - circleW) * blend;
@@ -48,14 +54,14 @@ export function NotchShape({ geometry, transition, elevated, tone, children }: P
   });
 
   // Fluid coordination between bottom corner radius (effectiveR) and top ears (effectiveEar).
-  // In the last stage of closing (h < 52px), effectiveR converges to half of effectiveW,
+  // In the last stage of closing (h < 16px), effectiveR converges to half of effectiveW,
   // making the entire bottom edge a single continuous circular curve with zero flat spots or sharp corners.
   const effectiveR = useTransform([r, ear, h, effectiveW], (values: number[]) => {
     const [curR = 20, curEar = 10, curH = 0, curW = 0] = values;
     if (curH <= 0.5 || curW <= 0.5) return 0;
     const halfW = curW / 2;
-    if (curH < 52) {
-      const progress = curH / 52;
+    if (curH < MORPH_THRESHOLD) {
+      const progress = curH / MORPH_THRESHOLD;
       const blend = progress * progress;
       const targetR = halfW + (curR - halfW) * blend;
       return Math.max(0, Math.min(targetR, halfW));
@@ -68,8 +74,8 @@ export function NotchShape({ geometry, transition, elevated, tone, children }: P
   // Top ears smoothly dissolve as the shape approaches the circle/ellipse stage
   const effectiveEar = useTransform([r, ear, h], (values: number[]) => {
     const [curR = 20, curEar = 10, curH = 0] = values;
-    if (curH <= 16) return 0;
-    const earFade = Math.min(1, Math.max(0, (curH - 16) / 20));
+    if (curH <= MORPH_THRESHOLD) return 0;
+    const earFade = Math.min(1, Math.max(0, (curH - MORPH_THRESHOLD) / 12));
     const sum = curR + curEar || 1;
     const maxEar = curH * (curEar / sum);
     return Math.max(0, Math.min(curEar, maxEar) * earFade);
