@@ -61,12 +61,37 @@ export const DEFAULT_NOTCH_TUNING: NotchTuning = {
   morphDuration: 0.34,
 };
 
+export type CompanionShape = "circle" | "squircle" | "pill" | "egg";
+export type CompanionColor = "glass" | "accent" | "gemini" | "dark" | "mint" | "amber" | "coral";
+export type CompanionEyes = "happy" | "curious" | "anime" | "cool";
+export type CompanionAccessory = "auto" | "headphones" | "beanie" | "halo" | "crown" | "none";
+
+export interface CompanionCustomization {
+  name: string;
+  shape: CompanionShape;
+  color: CompanionColor;
+  eyes: CompanionEyes;
+  accessory: CompanionAccessory;
+  aura: boolean;
+}
+
+export const DEFAULT_COMPANION: CompanionCustomization = {
+  name: "Gigi",
+  shape: "circle",
+  color: "glass",
+  eyes: "happy",
+  accessory: "auto",
+  aura: true,
+};
+
 export interface Settings {
   /** Open on hover or only on click (kept synced with notch.openMode). */
   openMode: "hover" | "click";
   hoverDelay: "fast" | "normal" | "patient";
   /** Live tunable parameters for our 3-stage notch & companion. */
   notch: NotchTuning;
+  /** Companion appearance, personality, and accessories. */
+  companion: CompanionCustomization;
   /** Order = order in the tool bar. */
   tools: { id: string; enabled: boolean }[];
   /** `auto` = detected via IP (again on every start); a picked location stays. */
@@ -123,6 +148,7 @@ const defaults: Settings = {
   openMode: "hover",
   hoverDelay: "normal",
   notch: { ...DEFAULT_NOTCH_TUNING },
+  companion: { ...DEFAULT_COMPANION },
   tools: TOOL_IDS.map((id) => ({ id, enabled: true })),
   weather: null,
   display: { visibility: "always", monitor: null, offset: 0, focusStyle: "dim", idleStyle: "notch", idleW: 188, idleH: 30 },
@@ -200,12 +226,20 @@ export function normalizeSettings(s: Settings): Settings {
     presentation: { ...defaults.presentation, ...s.presentation },
     updates: { ...defaults.updates, ...s.updates },
     appearance: { ...defaults.appearance, ...s.appearance },
+    companion: { ...DEFAULT_COMPANION, ...(s.companion ?? {}) },
   };
 }
 
 export const settings = createStore<Settings>(defaults, { persist: "settings", normalize: normalizeSettings });
 
 settings.set(normalizeSettings);
+
+export function updateCompanion(patch: Partial<CompanionCustomization>) {
+  settings.set((s) => ({
+    ...s,
+    companion: { ...s.companion, ...patch },
+  }));
+}
 
 export function updateNotch(patch: Partial<NotchTuning>) {
   settings.set((s) => {
