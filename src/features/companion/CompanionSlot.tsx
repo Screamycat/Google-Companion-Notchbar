@@ -172,18 +172,18 @@ export function NotchCompanion({ status, activeTab, size, geometry, line }: Notc
             className="pointer-events-none absolute inset-0 size-full overflow-visible"
             aria-hidden
           >
-            {/* Concentric headband floating above the head line with a larger radius */}
+            {/* Concentric headband floating with R=60 curvature above the head line */}
             <path
-              d="M -5 36 A 57 57 0 0 1 105 36"
+              d="M -7 31 A 60 60 0 0 1 107 31"
               fill="none"
               stroke="var(--accent, #4285f4)"
               strokeWidth="5"
               strokeLinecap="round"
             />
             {/* Left ear puff on the outer edge of the head */}
-            <rect x="-11" y="36" width="12" height="26" rx="6" fill="var(--accent, #4285f4)" />
+            <rect x="-13" y="30" width="12" height="28" rx="6" fill="var(--accent, #4285f4)" />
             {/* Right ear puff on the outer edge of the head */}
-            <rect x="99" y="36" width="12" height="26" rx="6" fill="var(--accent, #4285f4)" />
+            <rect x="101" y="30" width="12" height="28" rx="6" fill="var(--accent, #4285f4)" />
           </svg>
         )}
 
