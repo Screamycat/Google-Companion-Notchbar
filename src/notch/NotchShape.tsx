@@ -32,25 +32,47 @@ export function NotchShape({ geometry, transition, elevated, tone, children }: P
   const ear = useMotionValue(geometry.ear);
   const shadow = useMotionValue(elevated ? 1 : 0);
 
-  // Fluid coordination between bottom corner radius (effectiveR) and top ears (effectiveEar).
-  // When height h is large, both are at full size. As height shrinks below (r + ear),
-  // they proportionally partition the available height so the top ear's downward tangent
-  // and the bottom corner's curve meet at the exact same point with continuous tangent.
-  // This guarantees zero clash, zero hard edge, and a fluid droplet merge into the bezel.
-  const effectiveR = useTransform([r, ear, h], (values: number[]) => {
-    const [curR = 20, curEar = 10, curH = 0] = values;
+  // Smoothly morph into an ellipse / circle in the last stage of closing
+  // so the island tucks away as a fluid droplet instead of a flat wide bar.
+  const effectiveW = useTransform([w, h], (values: number[]) => {
+    const [curW = 0, curH = 0] = values;
     if (curH <= 0.5) return 0;
+    if (curH < 52) {
+      const progress = curH / 52;
+      const blend = progress * progress;
+      const circleW = curH * 2;
+      const maxAllowedW = circleW + (curW - circleW) * blend;
+      return Math.min(curW, Math.max(0, maxAllowedW));
+    }
+    return curW;
+  });
+
+  // Fluid coordination between bottom corner radius (effectiveR) and top ears (effectiveEar).
+  // In the last stage of closing (h < 52px), effectiveR converges to half of effectiveW,
+  // making the entire bottom edge a single continuous circular curve with zero flat spots or sharp corners.
+  const effectiveR = useTransform([r, ear, h, effectiveW], (values: number[]) => {
+    const [curR = 20, curEar = 10, curH = 0, curW = 0] = values;
+    if (curH <= 0.5 || curW <= 0.5) return 0;
+    const halfW = curW / 2;
+    if (curH < 52) {
+      const progress = curH / 52;
+      const blend = progress * progress;
+      const targetR = halfW + (curR - halfW) * blend;
+      return Math.max(0, Math.min(targetR, halfW));
+    }
     const sum = curR + curEar || 1;
     const maxR = curH * (curR / sum);
     return Math.max(0, Math.min(curR, maxR));
   });
 
+  // Top ears smoothly dissolve as the shape approaches the circle/ellipse stage
   const effectiveEar = useTransform([r, ear, h], (values: number[]) => {
     const [curR = 20, curEar = 10, curH = 0] = values;
-    if (curH <= 0.5) return 0;
+    if (curH <= 16) return 0;
+    const earFade = Math.min(1, Math.max(0, (curH - 16) / 20));
     const sum = curR + curEar || 1;
     const maxEar = curH * (curEar / sum);
-    return Math.max(0, Math.min(curEar, maxEar));
+    return Math.max(0, Math.min(curEar, maxEar) * earFade);
   });
 
   const earOffset = useTransform(effectiveEar, (e: number) => -e + 0.5); // 0.5px overlap against hairlines
@@ -58,7 +80,7 @@ export function NotchShape({ geometry, transition, elevated, tone, children }: P
 
   // Whole device pixels: the shape is centered, so an odd or fractional size puts its edges
   // (and the cover pinned to them) on subpixels that shift every frame, which reads as jitter.
-  const wPx = useTransform(w, snap);
+  const wPx = useTransform(effectiveW, snap);
   const hPx = useTransform(h, snap);
 
   const first = useRef(true);
@@ -123,7 +145,7 @@ export function NotchShape({ geometry, transition, elevated, tone, children }: P
           backdropFilter: tone.wash ? `blur(${tone.wash.blur}px)` : undefined,
         }}
       >
-        <ShapeWidth.Provider value={w}>{children}</ShapeWidth.Provider>
+        <ShapeWidth.Provider value={effectiveW}>{children}</ShapeWidth.Provider>
       </motion.div>
     </motion.div>
   );

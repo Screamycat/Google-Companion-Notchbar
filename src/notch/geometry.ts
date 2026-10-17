@@ -63,10 +63,10 @@ export function stageGeometry(notch: NotchTuning, tabSize?: { w: number; h: numb
 
   return {
     closed: {
-      w: tw,
+      w: notch.showHintLine ? tw : 0,
       h: notch.showHintLine ? 4 : 0,
-      r: peekR,
-      ear: peekEar,
+      r: notch.showHintLine ? 2 : peekR,
+      ear: 0,
     },
     peek: {
       w: pw,
