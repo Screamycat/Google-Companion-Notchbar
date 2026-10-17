@@ -32,21 +32,29 @@ export function NotchShape({ geometry, transition, elevated, tone, children }: P
   const ear = useMotionValue(geometry.ear);
   const shadow = useMotionValue(elevated ? 1 : 0);
 
-  // Ears never exceed body height or poke out when height collapses toward 0
-  const effectiveEar = useTransform([ear, h], (values: number[]) => {
-    const [e = 0, curH = 0] = values;
-    return Math.max(0, Math.min(e, curH));
+  // Fluid coordination between bottom corner radius (effectiveR) and top ears (effectiveEar).
+  // When height h is large, both are at full size. As height shrinks below (r + ear),
+  // they proportionally partition the available height so the top ear's downward tangent
+  // and the bottom corner's curve meet at the exact same point with continuous tangent.
+  // This guarantees zero clash, zero hard edge, and a fluid droplet merge into the bezel.
+  const effectiveR = useTransform([r, ear, h], (values: number[]) => {
+    const [curR = 20, curEar = 10, curH = 0] = values;
+    if (curH <= 0.5) return 0;
+    const sum = curR + curEar || 1;
+    const maxR = curH * (curR / sum);
+    return Math.max(0, Math.min(curR, maxR));
   });
+
+  const effectiveEar = useTransform([r, ear, h], (values: number[]) => {
+    const [curR = 20, curEar = 10, curH = 0] = values;
+    if (curH <= 0.5) return 0;
+    const sum = curR + curEar || 1;
+    const maxEar = curH * (curEar / sum);
+    return Math.max(0, Math.min(curEar, maxEar));
+  });
+
   const earOffset = useTransform(effectiveEar, (e: number) => -e + 0.5); // 0.5px overlap against hairlines
   const earOpacity = useTransform(effectiveEar, (e: number) => (e > 0.5 ? 1 : 0));
-
-  // The bottom corners must remain rounded throughout the entire closing animation.
-  // We guarantee effectiveR preserves the roundness all the way until height reaches 0.
-  const effectiveR = useTransform([r, h], (values: number[]) => {
-    const [curR = 0, curH = 0] = values;
-    if (curH <= 0.5) return 0;
-    return Math.max(curR, Math.min(curH * 0.45, 20));
-  });
 
   // Whole device pixels: the shape is centered, so an odd or fractional size puts its edges
   // (and the cover pinned to them) on subpixels that shift every frame, which reads as jitter.
