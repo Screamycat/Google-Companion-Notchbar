@@ -173,14 +173,14 @@ export function NotchCompanion({ status, activeTab, size, geometry, line }: Notc
             aria-hidden
           >
             <path
-              d="M 14 52 A 38 38 0 0 1 86 52"
+              d="M 9 27 A 45 45 0 0 1 91 27"
               fill="none"
               stroke="var(--accent, #4285f4)"
-              strokeWidth="5.5"
+              strokeWidth="5"
               strokeLinecap="round"
             />
-            <rect x="6" y="44" width="10" height="20" rx="5" fill="var(--accent, #4285f4)" />
-            <rect x="84" y="44" width="10" height="20" rx="5" fill="var(--accent, #4285f4)" />
+            <rect x="3" y="25" width="10" height="20" rx="5" fill="var(--accent, #4285f4)" />
+            <rect x="87" y="25" width="10" height="20" rx="5" fill="var(--accent, #4285f4)" />
           </svg>
         )}
 
