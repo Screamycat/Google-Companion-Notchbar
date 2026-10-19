@@ -732,7 +732,7 @@ function VibeThresholdsControl() {
       {/* Level 2 Threshold Slider */}
       <ThresholdSliderRow
         label="Level 2: Groove Point"
-        hint="Energy point where BMO starts head-bobbing and rhythm grooving"
+        hint="Energy point where your companion starts head-bobbing and rhythm grooving"
         value={groove}
         min={5}
         max={92}
@@ -745,7 +745,7 @@ function VibeThresholdsControl() {
       {/* Level 3 Threshold Slider */}
       <ThresholdSliderRow
         label="Level 3: Hype & Bass Drop"
-        hint="Energy point where BMO activates maximum excitement & bass hype"
+        hint="Energy point where your companion activates maximum excitement & bass hype"
         value={drop}
         min={15}
         max={99}

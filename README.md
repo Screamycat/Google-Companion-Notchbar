@@ -24,35 +24,43 @@
 
 ## What is Google-Companion Notchbar?
 
-**Google-Companion Notchbar** turns the top of your Windows screen into an interactive, fluid Dynamic Island inhabited by a living digital companion (**BMO**).
+**Google-Companion Notchbar** brings a modern, fluid Dynamic Island top bar to Windows, inhabited by a living, fully customizable desktop companion.
 
-It sits discreetly along your top screen bezel, reacts fluidly to hover and clicks, and seamlessly transitions through 3 stages:
-1. **Stage 1 — Closed:** A minimalist, sleek pill or completely hidden hover trigger strip that stays out of your way.
-2. **Stage 2 — Peek Island:** Expands into a compact interactive island housing your living companion, glanceable weather info, or live media playback controls.
-3. **Stage 3 — Expanded Notch:** Smoothly expands into full windows for system overview, music player, settings, and modular dock tools.
+Forked and evolved from [Linux5Real's L4-Windows-NotchBar](https://github.com/Linux5Real/L4-Windows-NotchBar), this repository transforms the original notch concept into a personal desktop space:
+* **Your Own Living Companion:** An autonomous, interactive buddy that lives directly at the top of your screen. Give it any name you want, choose its body shape, pick color palettes, equip hats and eyewear, pet or tickle it with your mouse, and watch it react and groove to your music.
+* **Smart Dynamic Notch:** Rests discreetly along the top bezel of your display. Hover or click to reveal glanceable weather, media playback controls, and modular tool tabs without interrupting your workflow.
+* **Music-Reactive Audio Engine:** Built-in DSP listening directly to Windows audio output via WASAPI loopback, with percussive transient detection and user-tunable vibe thresholds.
+* **Independent & Decoupled:** Dedicated release and in-app update pipeline, streamlined settings, modular tab groups, and continuous performance optimizations for Windows 10 & 11.
 
 ---
 
 ## Features
 
-### 👾 The Living Companion (BMO)
-* **Always Alive:** Lives continuously across Peek Island and Open Dropdown views with zero pop-in or lag.
-* **Interactive Gestures:**
-  * **Head Pats:** Gently hover above his head to pet him (shows blissful, blushing expressions).
-  * **Belly Tickles:** Wiggle your cursor back and forth across his body to tickle him with playful laughter.
-  * **Curious Watcher:** Tracks your mouse movements and curious glances.
-  * **Study State:** Quiet, focused study animations with his favorite book.
-* **Music Reactive Vibing:** Automatically equips glowing headphones when music plays and bobs to the beat across dynamic energy levels.
-* **Full Customization:** Choose from multiple shapes (Circle, Squircle, Egg, Scallop, Tower, Slime, Hexagon, Triangle), Google and custom color palettes, hats (Beanies, Crowns, Halos), and eyewear (Glasses, Shades).
+### 👾 The Living Companion
+* **Always Present:** Lives seamlessly inside the notch bar and expands into the full view with zero pop-in or stutter.
+* **Name & Appearance:** Give your companion your favorite name, and customize it with 9 distinct shapes (Circle, Squircle, Egg, Capsule, Scallop, Tower, Slime, Hexagon, Triangle), color themes, aura glows, cozy hats (Beanies, Crowns, Halos), and eyewear (Glasses, Shades).
+* **Tactile Interactions:**
+  * **Head Pats:** Gently stroke above its head to pet it (features purring smile and blush cheeks).
+  * **Belly Tickles:** Wiggle your cursor back and forth across its body to tickle it with giggling laughter.
+  * **Eye Tracking:** Follows cursor movements with curious glances across your desktop.
+  * **Idle Life:** Autonomous expressions, yawns, sneezes, and cozy study sessions with an open book.
+* **Dynamic Music Grooving:** Automatically puts on glowing headphones during audio playback and dances across 3 distinct energy tiers:
+  * **Level 1 (Chill Sway):** Relaxed, serene swaying for ambient, lo-fi, acoustic, and quiet passages.
+  * **Level 2 (Hard Groove):** Rhythmic head-bobbing and energized beats for upbeat tracks.
+  * **Level 3 (Super Hype):** Intense rock-out mode for bass drops, hardstyle, fast BPM, and climaxes.
+
+### 🎚️ Live Audio Analyzer & Vibe Thresholds
+* **Transient Impulse DSP:** Real-time crest factor and spectral flux analysis captures true percussive drum kicks and beat drops while keeping peaceful ambient music calm.
+* **Tunable Threshold Sliders:** Configure exact crossover points on a 0–100 energy scale directly in Settings, complete with a live needle indicator, active zone highlights, and real-time vibe state badges.
 
 ### 🎵 Media & System Control
-* **Now Playing:** Windows media session integration (Spotify, Chrome, browser players) with live album art, track scrubbers, and responsive playback controls.
-* **Overview Center:** Live clock, local weather forecast with auto IP detection, power controls (Lock & Sleep), Bluetooth battery indicators, and smooth volume & brightness sliders.
+* **Media Playback:** Real-time Windows media session integration (Spotify, Chrome, YouTube, Apple Music) with album art, track scrubbers, and playback controls.
+* **Overview Center:** Live clock, weather forecast with auto IP detection, power controls (Lock & Sleep), Bluetooth battery indicators, and smooth volume & brightness sliders.
 
-### 🎨 Modular Dock & Tab Categorization
-* **Categorized Bottom Dock:** Group your tools into custom categories. Tabs in different categories are automatically separated by elegant vertical `|` dividers in the dock.
-* **Tab Management:** Reorder tabs (Overview, Music, and future modular plugins) and configure their categories directly in Settings with a real-time dock preview.
-* **Background Visualizers:** Customize your notch backdrop with ambient audio visualizers, aurora borealis, night skies, synthwave neon grids, topographic contours, or frosted glass.
+### 🎨 Modular Dock & Tab Groups
+* **Grouped Bottom Dock:** Organize tools into custom groups separated by clean vertical `|` dividers in the dock.
+* **Drag-and-Drop Management:** Reorder dock tabs (Overview, Music, and upcoming modular extensions) and toggle visibility with an instant live dock preview in Settings.
+* **Dynamic Notch Backgrounds:** Customize your notch backdrop with ambient audio visualizers, aurora borealis, night skies, synthwave neon grids, topographic contours, or frosted glass.
 
 ---
 
