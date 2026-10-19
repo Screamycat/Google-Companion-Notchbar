@@ -203,7 +203,7 @@ export async function fetchChangelog(version: string): Promise<ChangelogEntry[] 
     return [{ version, date: new Date().toISOString().slice(0, 10), items: [mock, mock] }, ...bundledChangelog];
   }
   try {
-    const r = await fetch(`https://raw.githubusercontent.com/Screamycat/Google-NotchBar/v${version}/src/changelog.json`, {
+    const r = await fetch(`https://raw.githubusercontent.com/Screamycat/Google-Companion-Notchbar/v${version}/src/changelog.json`, {
       signal: AbortSignal.timeout(8000),
     });
     return r.ok ? ((await r.json()) as ChangelogEntry[]) : null;

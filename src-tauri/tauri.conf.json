@@ -53,7 +53,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEFGRjFDOUNBQTJDNzBCRkYKUldUL0M4ZWl5c254cnhYRGV5OXNCbDBPNWMzR3FRRzFESk9LZXBlcXg0OHgvOGJobHlDOWU3SnkK",
       "endpoints": [
-        "https://github.com/Screamycat/Google-NotchBar/releases/latest/download/latest.json"
+        "https://github.com/Screamycat/Google-Companion-Notchbar/releases/latest/download/latest.json"
       ],
       "windows": {
         "installMode": "passive"

@@ -5,19 +5,19 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Screamycat/Google-NotchBar/releases/latest"><img src="https://img.shields.io/github/v/release/Screamycat/Google-NotchBar?style=flat-square&label=release&color=111" alt="Latest release" /></a>
+  <a href="https://github.com/Screamycat/Google-Companion-Notchbar/releases/latest"><img src="https://img.shields.io/github/v/release/Screamycat/Google-Companion-Notchbar?style=flat-square&label=release&color=111" alt="Latest release" /></a>
   <img src="https://img.shields.io/badge/Windows-10%20%7C%2011-111?style=flat-square" alt="Windows 10 and 11" />
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-111?style=flat-square" alt="GPL-3.0" /></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/Screamycat/Google-NotchBar/releases/latest"><b>Download</b></a>
+  <a href="https://github.com/Screamycat/Google-Companion-Notchbar/releases/latest"><b>Download</b></a>
   &nbsp;·&nbsp;
   <a href="#features"><b>Features</b></a>
   &nbsp;·&nbsp;
   <a href="#settings--customization"><b>Customization</b></a>
   &nbsp;·&nbsp;
-  <a href="https://github.com/Screamycat/Google-NotchBar/issues/new"><b>Suggest an idea</b></a>
+  <a href="https://github.com/Screamycat/Google-Companion-Notchbar/issues/new"><b>Suggest an idea</b></a>
 </p>
 
 ---
@@ -58,7 +58,7 @@ It sits discreetly along your top screen bezel, reacts fluidly to hover and clic
 
 ## Installation
 
-1. Download `Google-Companion Notchbar_x.y.z_x64-setup.exe` from the [Latest Release](https://github.com/Screamycat/Google-NotchBar/releases/latest).
+1. Download `Google-Companion Notchbar_x.y.z_x64-setup.exe` from the [Latest Release](https://github.com/Screamycat/Google-Companion-Notchbar/releases/latest).
 2. Run the installer. No developer tools or administrative privileges required — installs cleanly into your user profile.
 3. The notch will appear at the top of your display and launch automatically on Windows login (configurable in settings).
 
@@ -83,7 +83,7 @@ The settings window is neatly structured into 5 dedicated pages:
 
 ## In-App Updates
 
-* **Automated & Signed:** Updates are securely signed using minisign and fetched directly from GitHub releases (`Screamycat/Google-NotchBar`).
+* **Automated & Signed:** Updates are securely signed using minisign and fetched directly from GitHub releases (`Screamycat/Google-Companion-Notchbar`).
 * **Silent & Safe:** The app checks for new updates daily in the background (or on demand under **Settings → General → Updates**) without transmitting any personal data.
 
 ---
@@ -100,8 +100,8 @@ Built with modern high-performance desktop technologies:
 
 ```bash
 # Clone the repository
-git clone https://github.com/Screamycat/Google-NotchBar.git
-cd Google-NotchBar
+git clone https://github.com/Screamycat/Google-Companion-Notchbar.git
+cd Google-Companion-Notchbar
 
 # Install dependencies
 npm install

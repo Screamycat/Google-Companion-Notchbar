@@ -75,7 +75,7 @@ function photo(w: number, h: number): string {
 /** Ages in ms (relative to page load). */
 export const showcaseClips = [
   { id: 1, kind: "image" as const, text: "4032 × 3024", thumbnail: photo(4032, 3024), folders: 0, age: 8_000 },
-  { id: 2, kind: "link" as const, text: "https://github.com/Screamycat/Google-NotchBar", thumbnail: null, folders: 0, age: 130_000 },
+  { id: 2, kind: "link" as const, text: "https://github.com/Screamycat/Google-Companion-Notchbar", thumbnail: null, folders: 0, age: 130_000 },
   { id: 3, kind: "text" as const, text: "export const open = spring(0.42, 0.24);", thumbnail: null, folders: 0, age: 380_000 },
   { id: 4, kind: "text" as const, text: "Rijksmuseum, Museumstraat 1, 1071 XX Amsterdam", thumbnail: null, folders: 0, age: 1_100_000 },
   { id: 5, kind: "files" as const, text: "Q3-Report.pdf\nBudget-2027.xlsx", thumbnail: null, folders: 0, age: 2_500_000 },
