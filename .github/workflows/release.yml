@@ -30,9 +30,8 @@ jobs:
           version=$(jq -r .version src-tauri/tauri.conf.json)
           echo "version=$version" >> "$GITHUB_OUTPUT"
           if gh release view "v$version" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "Release v$version already exists, nothing to do."
-            echo "release=false" >> "$GITHUB_OUTPUT"
-            exit 0
+            echo "Release v$version exists, deleting to replace with fresh build..."
+            gh release delete "v$version" -R "$GITHUB_REPOSITORY" --yes || true
           fi
           echo "release=true" >> "$GITHUB_OUTPUT"
           # Hand-written notes with screenshots (docs/releases/vX.Y.Z.md), if there are any.
