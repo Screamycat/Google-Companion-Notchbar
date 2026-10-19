@@ -1,3 +1,5 @@
+import { useClipboard } from "../../platform/clipboard";
+import { converterStore } from "../convert/ConvertView";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion, type Variants } from "motion/react";
 import {
@@ -21,7 +23,7 @@ import {
 
 export type { CompanionMood, AudioClassification, DaydreamEmoji };
 export { classifyAudio };
-export type CompanionVariant = "peek" | "overview" | "music";
+export type CompanionVariant = "peek" | "overview" | "music" | "clipboard" | "convert";
 
 export interface NotchCompanionProps {
   status: NotchStatus;
@@ -421,6 +423,29 @@ export function DaydreamBubble({ emoji }: { emoji: DaydreamEmoji }) {
  * - Guarantees smooth spring-damped return to `rotate: 0` whenever an animation ends
  */
 export const COMPANION_MOTION_VARIANTS: Variants = {
+  smelting: {
+    y: [0, -2, 1, -1.5, 0],
+    rotate: [-3.5, 3.5, -3.5, 3.5, 0],
+    scale: [1, 1.05, 0.98, 1.03, 1],
+    x: [0, -1.5, 1.5, -1, 1, 0],
+    transition: {
+      repeat: Infinity,
+      duration: 0.32,
+      ease: "easeInOut",
+    },
+  },
+  hungry: {
+    y: [0, -2, 0],
+    rotate: 0,
+    scale: 1.04,
+    x: 0,
+    transition: {
+      repeat: Infinity,
+      duration: 2.0,
+      ease: "easeInOut",
+    },
+  },
+
   happy: {
     y: [0, -2.2, 0],
     rotate: 0,
@@ -627,13 +652,35 @@ export function NotchCompanion({ status, activeTab, size, geometry, line }: Notc
   const isOpen = status === "open";
   const isOverview = isOpen && activeTab === "overview";
   const isMusic = isOpen && activeTab === "media";
+  const isClipboard = isOpen && activeTab === "clipboard";
+  const isConvert = isOpen && activeTab === "convert";
+
+  const clipItems = useClipboard();
+  const hasClips = clipItems.length > 0;
+  const { filesCount } = converterStore.use();
+  const hasFiles = filesCount > 0;
 
   // Derive variant for layout sizing and positioning
-  const variant: CompanionVariant = isMusic ? "music" : isPeek ? "peek" : "overview";
+  const variant: CompanionVariant = isMusic
+    ? "music"
+    : isPeek
+      ? "peek"
+      : isClipboard
+        ? "clipboard"
+        : isConvert
+          ? "convert"
+          : "overview";
 
   // Dimensions
   const musicSize = Math.round(companionSize * 0.88);
-  const targetSize = isPeek ? 32 : isMusic ? musicSize : companionSize;
+  const sideSize = Math.round(companionSize * 0.72);
+  const targetSize = isPeek
+    ? 32
+    : isMusic
+      ? musicSize
+      : (isClipboard && hasClips) || (isConvert && hasFiles)
+        ? sideSize
+        : companionSize;
 
   // Vertical center inside content area (between Header 32px and Dock 46px)
   const contentCenterY = (size.h - 14) / 2;
@@ -642,14 +689,21 @@ export function NotchCompanion({ status, activeTab, size, geometry, line }: Notc
   // Horizontal center offset (0 = center of notch):
   const musicCenterX = -size.w / 2 + 24 + musicSize / 2;
   const peekCenterX = -geometry.w / 2 + 24;
-  const targetCenterX = isMusic ? musicCenterX : isPeek ? peekCenterX : 0;
+  const sideCenterX = -size.w / 2 + 20 + sideSize / 2;
+  const targetCenterX = isMusic
+    ? musicCenterX
+    : isPeek
+      ? peekCenterX
+      : (isClipboard && hasClips) || (isConvert && hasFiles)
+        ? sideCenterX
+        : 0;
 
   // Exact relative coordinate offsets from left: 50%, top: 0:
   const targetX = Math.round(targetCenterX - targetSize / 2);
   const targetY = Math.round(targetCenterY - targetSize / 2);
 
   // Visibility
-  const isVisible = (isPeek || isOverview || isMusic) && geometry.h > 4;
+  const isVisible = (isPeek || isOverview || isMusic || isClipboard || isConvert) && geometry.h > 4;
   const targetScale = isVisible ? 1 : 0.2;
   const targetOpacity = isVisible ? 1 : 0;
 
@@ -658,7 +712,9 @@ export function NotchCompanion({ status, activeTab, size, geometry, line }: Notc
     ? window.innerWidth / 2 + musicCenterX
     : isPeek
       ? window.innerWidth / 2 + peekCenterX
-      : window.innerWidth / 2;
+      : (isClipboard && hasClips) || (isConvert && hasFiles)
+        ? window.innerWidth / 2 + sideCenterX
+        : window.innerWidth / 2;
   const cy = isPeek ? geometry.h / 2 : contentCenterY;
 
   // Autonomous Tamagotchi Brain
@@ -1539,6 +1595,20 @@ export function FaceOverlay({
             {/* Cozy study blush */}
             <circle cx="27" cy="45" r="3.4" fill="#ff7698" opacity="0.5" />
             <circle cx="73" cy="45" r="3.4" fill="#ff7698" opacity="0.5" />
+          </>
+                ) : mood === "smelting" ? (
+          /* Dizzy spinning blender eyes '@ @' and open teeth/grin */
+          <>
+            <path d="M 28 38 C 34 34, 40 40, 36 44 C 32 48, 28 42, 33 39" fill="none" stroke="white" strokeWidth="3.6" strokeLinecap="round" />
+            <path d="M 58 38 C 64 34, 70 40, 66 44 C 62 48, 58 42, 63 39" fill="none" stroke="white" strokeWidth="3.6" strokeLinecap="round" />
+            <ellipse cx="50" cy="62" rx="7" ry="5" fill="white" />
+          </>
+        ) : mood === "hungry" ? (
+          /* Wide open hungry mouth 'O' waiting to swallow files with bright eyes */
+          <>
+            <circle cx="34" cy="40" r="5.8" fill="white" />
+            <circle cx="66" cy="40" r="5.8" fill="white" />
+            <circle cx="50" cy="62" r="7.5" fill="white" />
           </>
         ) : mood === "vibing-chill" ? (
           /* Level 1 Chill Vibe: Serene closed arches and relaxed content smile */

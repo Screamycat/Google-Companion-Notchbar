@@ -1,3 +1,4 @@
+import { triggerCompanionMood } from "../companion/companionBrain";
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
@@ -134,6 +135,7 @@ export function ClipboardView() {
           onClick={() => {
             setPreviewId(null);
             clipboard.clear();
+            triggerCompanionMood("sad", 1500);
           }}
         >
           <Trash size={14} weight="bold" />
@@ -142,8 +144,8 @@ export function ClipboardView() {
 
       <div
         ref={scroller}
-        className="flex shrink-0 gap-2 overflow-x-auto px-4 pt-1 [scrollbar-width:none]"
-        style={{ height: ROW_H, maskImage: "linear-gradient(90deg, transparent, #000 12px, #000 calc(100% - 24px), transparent)" }}
+        className="flex shrink-0 gap-2 overflow-x-auto pr-4 pl-[68px] pt-1 [scrollbar-width:none]"
+        style={{ height: ROW_H, maskImage: "linear-gradient(90deg, transparent 48px, #000 68px, #000 calc(100% - 24px), transparent)" }}
       >
         {items.length === 0 && <div className="flex w-full items-center justify-center text-body text-label-3">{t("Nichts in dieser Kategorie")}</div>}
         <AnimatePresence initial={false} mode="popLayout">

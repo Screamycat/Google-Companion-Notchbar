@@ -71,7 +71,9 @@ export function Notch() {
       ? { w: Math.max(notchTuning.openW, settingsTab.size.w), h: Math.max(notchTuning.openH, settingsTab.size.h) }
       : tab.id === "media"
         ? { w: notchTuning.openW, h: 224 }
-        : { w: notchTuning.openW, h: notchTuning.openH };
+        : tab.id === "clipboard"
+          ? { w: Math.max(notchTuning.openW, 580), h: 232 }
+          : { w: notchTuning.openW, h: notchTuning.openH };
   const size = override?.tabId === tab.id ? { w: baseSize.w, h: override.h } : baseSize;
 
   const isMusicActive = Boolean(np && (np.isPlaying || np.title));

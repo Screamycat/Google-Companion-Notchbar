@@ -19,7 +19,16 @@ export type CompanionMood =
   | "petting"
   | "tickled"
   | "yawn"
-  | "sneeze";
+  | "sneeze"
+  | "smelting"
+  | "hungry";
+
+
+export function triggerCompanionMood(mood: CompanionMood, durationMs = 2000) {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("companion:mood", { detail: { mood, duration: durationMs } }));
+  }
+}
 
 export interface AudioClassification {
   isAudioActive: boolean;
@@ -223,6 +232,8 @@ export const MIN_MOOD_DURATION_MS: Record<CompanionMood, number> = {
   "vibing-hard": 1200,
   "vibing-chill": 1200,
   vibing: 1200,
+  smelting: 2500,
+  hungry: 1500,
   happy: 0,
 };
 
@@ -312,6 +323,18 @@ export function useCompanionBrain({
   };
 
   // Triggers an emotion and locks it for its minimum duration to avoid rapid back-and-forth jitter
+  
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ mood: CompanionMood; duration: number }>).detail;
+      if (detail?.mood) {
+        triggerMood(detail.mood, detail.duration, true);
+      }
+    };
+    window.addEventListener("companion:mood", handler);
+    return () => window.removeEventListener("companion:mood", handler);
+  }, []);
+
   const triggerMood = (newMood: CompanionMood, customDurationMs?: number, force = false) => {
     const now = performance.now();
     if (!force && now < moodLockedUntilRef.current) {

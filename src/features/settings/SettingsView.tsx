@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, Reorder } from "motion/react";
 import {
   ArrowCounterClockwise,
@@ -21,7 +21,7 @@ import { autostart, display, type ChangelogEntry, type MonitorInfo } from "../..
 import { checkForUpdate, installUpdate, update } from "../../lib/update";
 import { between, changelog, itemText, markSeen, useUnseen } from "../../lib/changelog";
 import { useNowPlaying } from "../../platform/media";
-import { findTab, type NotchTab } from "../../notch/tabs";
+import { findTab } from "../../notch/tabs";
 import {
   DEFAULT_NOTCH_TUNING,
   resetNotchTuning,
@@ -1063,48 +1063,13 @@ function TabsPage() {
     }));
   };
 
-  // Preview elements for the dock preview banner
-  const activeTabs = tools
-    .filter((t) => t.enabled)
-    .map((t) => {
-      const base = findTab(t.id);
-      if (!base) return null;
-      return { ...base, category: t.category || base.category };
-    })
-    .filter((t): t is NotchTab => !!t);
-
   return (
     <>
-      <Group title="Dock Preview">
-        <div className="flex flex-col items-center justify-center gap-2 p-3 text-center">
-          <div className="flex items-center gap-1.5 rounded-[12px] border border-white/10 bg-fill-1 px-4 py-2">
-            {activeTabs.map((tab, idx) => {
-              const prev = idx > 0 ? activeTabs[idx - 1].category : tab.category;
-              const showDivider = idx > 0 && prev !== tab.category;
-              const I = tab.icon;
-              return (
-                <Fragment key={tab.id}>
-                  {showDivider && <span aria-hidden className="mx-1 h-3.5 w-px bg-separator" />}
-                  <span className="flex items-center gap-1 rounded-[8px] bg-fill-2 px-2.5 py-1 text-footnote font-medium text-label">
-                    <I size={13} weight="bold" />
-                    <span>{tab.label}</span>
-                  </span>
-                </Fragment>
-              );
-            })}
-            <span aria-hidden className="mx-1 h-3.5 w-px bg-separator" />
-            <span className="flex items-center gap-1 rounded-[8px] bg-fill-2/50 px-2 py-1 text-footnote text-label-3">
-              <GearSix size={13} weight="bold" />
-              <span>Settings</span>
-            </span>
-          </div>
-          <p className="text-[11px] text-label-3">
-            Tabs with matching groups sit together. Different groups are separated by a <code className="rounded bg-fill-2 px-1 text-label font-mono">|</code> divider. Drag tabs vertically to reorder.
-          </p>
-        </div>
-      </Group>
-
       <Group title="Dock Tabs">
+        <p className="px-3 pb-2 text-[11px] text-label-3">
+          Drag tabs vertically to reorder. Different groups are separated by a <code className="rounded bg-fill-2 px-1 text-label font-mono">|</code> divider in the dock.
+        </p>
+
         <Reorder.Group
           as="div"
           axis="y"

@@ -1,3 +1,5 @@
+import { createStore } from "../../lib/store";
+import { triggerCompanionMood } from "../companion/companionBrain";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
@@ -47,6 +49,12 @@ const sizes = [
   { value: "512", label: "512" },
 ];
 
+
+export const converterStore = createStore<{ filesCount: number; isConverting: boolean }>({
+  filesCount: 0,
+  isConverting: false,
+});
+
 type Mode = "files" | "units";
 
 export function ConvertView() {
@@ -92,6 +100,16 @@ function FilesPanel() {
   const [busy, setBusy] = useState(false);
   const [results, setResults] = useState<ConvertResult[] | null>(null);
   const [nothing, setNothing] = useState(false);
+
+  useEffect(() => {
+    converterStore.set({ filesCount: files.length, isConverting: busy });
+  }, [files.length, busy]);
+
+  useEffect(() => {
+    if (dragging) {
+      triggerCompanionMood("hungry", 1800);
+    }
+  }, [dragging]);
   usePasteFiles(() => {
     setNothing(true);
     setTimeout(() => setNothing(false), 1600);
@@ -153,7 +171,7 @@ function FilesPanel() {
   const failed = results?.filter((r) => r.error) ?? [];
 
   return (
-    <div className="flex h-full flex-col gap-2">
+    <div className="flex h-full flex-col gap-2 pl-[68px]">
       <div className="min-h-0 flex-1 overflow-y-auto rounded-[12px] bg-fill-1 [scrollbar-width:none]">
         {files.map((f) => {
           const I = kindIcon[f.kind];
