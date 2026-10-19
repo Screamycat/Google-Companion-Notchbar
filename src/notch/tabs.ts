@@ -1,5 +1,7 @@
 import type { ComponentType } from "react";
 import {
+  ArrowsLeftRight,
+  ClipboardText,
   GearSix,
   MusicNotesSimple,
   SquaresFour,
@@ -7,6 +9,8 @@ import {
 } from "@phosphor-icons/react";
 import { OverviewView } from "../features/overview/OverviewView";
 import { NowPlayingView } from "../features/now-playing/NowPlayingView";
+import { ClipboardView } from "../features/clipboard/ClipboardView";
+import { ConvertView } from "../features/convert/ConvertView";
 import { SettingsView } from "../features/settings/SettingsView";
 
 /**
@@ -39,6 +43,22 @@ export const tabs: NotchTab[] = [
     category: "main",
     size: { w: 540, h: 224 },
     View: NowPlayingView,
+  },
+  {
+    id: "clipboard",
+    label: "Clipboard",
+    icon: ClipboardText,
+    category: "tools",
+    size: { w: 600, h: 236 },
+    View: ClipboardView,
+  },
+  {
+    id: "convert",
+    label: "Converter",
+    icon: ArrowsLeftRight,
+    category: "tools",
+    size: { w: 520, h: 290 },
+    View: ConvertView,
   },
 ];
 

@@ -177,14 +177,19 @@ export interface Settings {
 export type AppearanceEffect = "none" | "visualizer" | "ambient" | "waves" | "aurora" | "holographic" | "topographic" | "synthwave" | "nightsky";
 
 /** Active tool IDs in the clean-slate dock. Must match `src/notch/tabs.ts`. */
-export const TOOL_IDS = ["overview", "media"] as const;
+export const TOOL_IDS = ["overview", "media", "clipboard", "convert"] as const;
 
 const defaults: Settings = {
   openMode: "hover",
   hoverDelay: "normal",
   notch: { ...DEFAULT_NOTCH_TUNING },
   companion: { ...DEFAULT_COMPANION },
-  tools: TOOL_IDS.map((id) => ({ id, enabled: true, category: "main" })),
+  tools: [
+    { id: "overview", enabled: true, category: "main" },
+    { id: "media", enabled: true, category: "main" },
+    { id: "clipboard", enabled: true, category: "tools" },
+    { id: "convert", enabled: true, category: "tools" },
+  ],
   weather: null,
   display: { visibility: "always", monitor: null, offset: 0, idleStyle: "notch", idleW: 188, idleH: 30 },
   gaming: { mode: "off" },
@@ -249,8 +254,9 @@ export function normalizeSettings(s: Settings): Settings {
     }));
   for (const id of TOOL_IDS) {
     if (tools.some((t) => t.id === id)) continue;
-    if (id === "overview") tools.unshift({ id, enabled: true, category: "main" });
-    else tools.push({ id, enabled: true, category: "main" });
+    const defaultCat = id === "clipboard" || id === "convert" ? "tools" : "main";
+    if (id === "overview") tools.unshift({ id, enabled: true, category: defaultCat });
+    else tools.push({ id, enabled: true, category: defaultCat });
   }
   const notch: NotchTuning = { ...DEFAULT_NOTCH_TUNING, ...(s.notch ?? {}) };
   return {
