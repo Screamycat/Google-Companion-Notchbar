@@ -65,26 +65,3 @@ export function setMemoryLow(low: boolean) {
   if (isNative) void invoke("memory_low", { low });
 }
 
-/** Focus mode: window fully click-through (Rust only counts clicks to exit). */
-export function setPassthrough(on: boolean) {
-  if (isNative) void invoke("set_passthrough", { on });
-}
-
-/** Mirrors focus mode into the tray menu's check item. */
-export function syncFocusTray(on: boolean) {
-  if (isNative) void invoke("tray_focus", { on });
-}
-
-/** Focus mode switched from the tray menu. */
-export function onFocusFromTray(handler: (on: boolean) => void): () => void {
-  if (!isNative) return () => {};
-  const off = listen<boolean>("notch://focus-set", (e) => handler(e.payload));
-  return () => void off.then((f) => f());
-}
-
-/** Three quick clicks on the notch in focus mode. */
-export function onFocusExit(handler: () => void): () => void {
-  if (!isNative) return () => {};
-  const off = listen("notch://focus-exit", handler);
-  return () => void off.then((f) => f());
-}

@@ -18,7 +18,7 @@ export interface NotchTab {
   id: string;
   label: string;
   icon: Icon;
-  category: "main" | "system";
+  category: string;
   size: { w: number; h: number };
   View: ComponentType;
 }
@@ -26,7 +26,7 @@ export interface NotchTab {
 export const tabs: NotchTab[] = [
   {
     id: "overview",
-    label: "Übersicht",
+    label: "Overview",
     icon: SquaresFour,
     category: "main",
     size: { w: 540, h: 300 },
@@ -34,10 +34,10 @@ export const tabs: NotchTab[] = [
   },
   {
     id: "media",
-    label: "Wiedergabe",
+    label: "Music",
     icon: MusicNotesSimple,
     category: "main",
-    size: { w: 540, h: 260 },
+    size: { w: 540, h: 224 },
     View: NowPlayingView,
   },
 ];
@@ -45,7 +45,7 @@ export const tabs: NotchTab[] = [
 /** Settings tab: separated by a `|` divider to the right in its own category. */
 export const settingsTab: NotchTab = {
   id: "settings",
-  label: "Einstellungen",
+  label: "Settings",
   icon: GearSix,
   category: "system",
   size: { w: 620, h: 420 },

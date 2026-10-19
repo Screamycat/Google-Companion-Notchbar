@@ -1,4 +1,3 @@
-import { settings } from "../settings/store";
 import { en } from "./en";
 
 /*
@@ -13,18 +12,18 @@ import { en } from "./en";
 export type Language = "de" | "en";
 
 export function lang(): Language {
-  return settings.get().language;
+  return "en";
 }
 
 export function t(de: string, vars?: Record<string, string | number>): string {
-  let s = lang() === "en" ? (en[de] ?? de) : de;
+  let s = en[de] ?? de;
   if (vars) for (const [k, v] of Object.entries(vars)) s = s.replaceAll(`{${k}}`, String(v));
   return s;
 }
 
 /** Locale for Intl (numbers, dates, weekdays). */
 export function locale(): string {
-  return lang() === "en" ? "en-GB" : "de-DE";
+  return "en-US";
 }
 
 /** Error texts from Rust (AI chat, converter) arrive in German; translate them by pattern. */

@@ -1,5 +1,27 @@
 [
   {
+    "version": "0.0.1",
+    "date": "2026-10-19",
+    "items": [
+      {
+        "de": "Living Companion: Unser interaktiver Begleiter lebt in der Notch mit Animationen, Emotionen, Streichel- und Kitzelfunktionen sowie Musik-Reaktivität",
+        "en": "Living Companion: Interactive companion lives in the notch with animations, emotions, pet & tickle gestures, and music-reactive vibing"
+      },
+      {
+        "de": "Flüssiger 3-Stufen-Notch-Ablauf: Stufenlose Übergänge zwischen geschlossenem Zustand, Peek-Insel und vollständiger Notch-Ansicht",
+        "en": "Fluid 3-Stage Notch: Seamless transitions between closed pill, peek island, and full notch view"
+      },
+      {
+        "de": "Strukturierte Einstellungen: 5 übersichtliche Bereiche für Begleiter-Anpassung mit Musik-Schwellenreglern, Aussehen, Notch-Größe & Geometrie, gruppierbare Tabs sowie System & Updates",
+        "en": "Structured Settings: 5 organized pages for companion customization with audio vibe thresholds, appearance, size & geometry, grouped tabs, and system & updates"
+      },
+      {
+        "de": "Eigenes Update-System: Nahtlose Aktualisierungen direkt über das neue Google NotchBar GitHub-Repository",
+        "en": "Dedicated Update System: Seamless update delivery directly from the new Google NotchBar GitHub repository"
+      }
+    ]
+  },
+  {
     "version": "1.7.0",
     "date": "2026-10-11",
     "items": [

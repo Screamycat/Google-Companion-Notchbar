@@ -1,37 +1,49 @@
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { AnimatePresence, LayoutGroup, motion, type Transition } from "motion/react";
-import { PushPin, Selection } from "@phosphor-icons/react";
+import {
+  Minus,
+  Pause,
+  Play,
+  PushPin,
+  SkipBack,
+  SkipForward,
+  SunDim,
+  X,
+} from "@phosphor-icons/react";
 import { content, springs } from "../design/motion";
-import { useNowPlaying } from "../platform/media";
+import { media, useNowPlaying } from "../platform/media";
 import { isNative, hitExtra, keyboardFocus, onNativeBlur, onNativeHover, onShortcut, onTrayOpen, setHitRect, setMemoryLow } from "../platform/native";
-import { FOCUS_CLICKS, focusMode, setFocusMode } from "./focus";
 import { useDragToMove } from "./drag";
-import { DOCK_HEIGHT, HEADER_HEIGHT, geometry, stageGeometry, type NotchGeometry } from "./geometry";
+import { DOCK_HEIGHT, HEADER_HEIGHT, stageGeometry, type NotchGeometry } from "./geometry";
 import { HeaderButton, headerSlot } from "./header";
 import { sizeOverride } from "./size";
 import { NotchShape } from "./NotchShape";
 import { BackgroundEffects } from "./BackgroundEffects";
 import { settings, type NotchTuning } from "../settings/store";
-import { useUnseen } from "../lib/changelog";
+import { markSeen, useUnseen } from "../lib/changelog";
 import { nav, navigate } from "./nav";
 import { update } from "../lib/update";
 import { findTab, settingsTab, tabs, type NotchTab } from "./tabs";
 import { holdOpen, pinned, togglePin, useNotchState, type NotchStatus } from "./useNotchState";
 import { NotchCompanion } from "../features/companion/CompanionSlot";
+import { describe, useForecast } from "../features/weather/store";
+import { formatTemp } from "../lib/format";
 import { t } from "../i18n";
 
 /** Closed this long → lower WebView2's memory target. */
 const MEMORY_LOW_AFTER_MS = 20_000;
 
 export function Notch() {
-  const { status, open, close, dismiss, toggle, onPointerEnter, onPointerLeave } = useNotchState();
-  const focus = focusMode.use();
-  const { tools: toolSettings, display: displaySettings, appearance, notch: notchTuning } = settings.use();
-  const line = focus && displaySettings.focusStyle === "line";
+  const { status, open, close, dismiss, toggle, minimize, onPointerEnter, onPointerLeave } = useNotchState();
+  const { tools: toolSettings, appearance, notch: notchTuning } = settings.use();
 
   const enabledTabs = toolSettings
     .filter((t) => t.enabled)
-    .map((t) => findTab(t.id))
+    .map((t) => {
+      const base = findTab(t.id);
+      if (!base) return null;
+      return { ...base, category: t.category || base.category };
+    })
     .filter((t): t is NotchTab => !!t);
   const dockTabs: NotchTab[] = [...(enabledTabs.length > 0 ? enabledTabs : tabs), settingsTab];
 
@@ -52,17 +64,20 @@ export function Notch() {
 
   const override = sizeOverride.use();
   // Use live notchTuning openW/openH as the base open size for main tabs,
-  // while allowing Settings or expanded Mixer to use their height when needed.
+  // while allowing Settings or expanded Mixer to use their height when needed,
+  // and media tab uses 224px height to avoid empty dead space.
   const baseSize =
     tab.id === settingsTab.id
       ? { w: Math.max(notchTuning.openW, settingsTab.size.w), h: Math.max(notchTuning.openH, settingsTab.size.h) }
-      : { w: notchTuning.openW, h: notchTuning.openH };
+      : tab.id === "media"
+        ? { w: notchTuning.openW, h: 224 }
+        : { w: notchTuning.openW, h: notchTuning.openH };
   const size = override?.tabId === tab.id ? { w: baseSize.w, h: override.h } : baseSize;
 
-  const stages = stageGeometry(notchTuning, size);
-  const shape = line
-    ? geometry.line
-    : status === "open"
+  const isMusicActive = Boolean(np && (np.isPlaying || np.title));
+  const stages = stageGeometry(notchTuning, size, isMusicActive);
+  const shape =
+    status === "open"
       ? stages.open
       : status === "peek"
         ? stages.peek
@@ -85,13 +100,13 @@ export function Notch() {
   }, [cycling]);
 
   const fills = CARD_FILLS[appearance.cards];
-  const isOpen = status === "open";
-  const chromeBg = isOpen ? appearance.expanded : appearance.resting;
+  const hasExpandedBg = status !== "closed";
+  const chromeBg = hasExpandedBg ? appearance.expanded : appearance.resting;
   const chromeLight = luminance(chromeBg) > 0.55;
   const ink = chromeLight ? "0 0 0" : "255 255 255";
   const tone = {
     solid: chromeBg,
-    wash: !isOpen
+    wash: !hasExpandedBg
       ? null
       : appearance.material === "glass"
         ? { color: `color-mix(in srgb, ${appearance.expanded} 55%, transparent)`, blur: 18 }
@@ -158,14 +173,12 @@ export function Notch() {
     if (next && next.id !== tab.id) navigate(next.id);
   };
 
-  useEffect(() => {
-    if (focus) close();
-  }, [focus, close]);
-
   const onClick = (e: React.MouseEvent) => {
-    if (drag.moved()) return;
-    if (e.detail >= FOCUS_CLICKS && !isInteractive(e.target)) return setFocusMode(!focus);
-    if (!focus && status !== "open") open();
+    if (drag.moved() || isInteractive(e.target)) return;
+    if (status !== "open") {
+      open();
+      pinned.set(true);
+    }
   };
 
   useEffect(() => onShortcut(() => toggle() === "open" && keyboardFocus(true)), [toggle]);
@@ -236,7 +249,6 @@ export function Notch() {
                 ["--color-elevated" as string]: "#f2f2f6",
               }
             : null),
-          opacity: focus && !line ? 0.5 : 1,
           transform: isNative ? undefined : `translateX(${drag.offset}px)`,
         }}
       >
@@ -252,12 +264,22 @@ export function Notch() {
             cursor: drag.dragging ? "grabbing" : status === "peek" ? "pointer" : undefined,
           }}
           onPointerMove={sticky.onPointerMove}
-          onPointerDown={focus ? undefined : drag.onPointerDown}
-          onPointerEnter={isNative || focus ? undefined : onPointerEnter}
-          onPointerLeave={isNative || focus ? undefined : onPointerLeave}
+          onPointerDown={drag.onPointerDown}
+          onPointerEnter={isNative ? undefined : onPointerEnter}
+          onPointerLeave={isNative ? undefined : onPointerLeave}
           onClick={onClick}
         >
           <NotchShape geometry={shaped} transition={transition} elevated={status !== "closed"} tone={tone}>
+            {/* Background animated effects for both peek and open states */}
+            {status !== "closed" && appearance.effect !== "none" && (
+              <BackgroundEffects effect={appearance.effect} playing={np?.isPlaying ?? false} radius={shaped.r} />
+            )}
+
+            {/* Stage 2 (Peek / Minimized Tiny Island): Living space for BMO */}
+            <AnimatePresence>
+              {status === "peek" && <TinyIslandContent key="tiny-island" np={np} />}
+            </AnimatePresence>
+
             {/* Stage 3 (Open Dropdown): Header + Active Tab + Categorized Bottom Dock */}
             <AnimatePresence>
               {status === "open" && (
@@ -270,10 +292,12 @@ export function Notch() {
                   animate={{ opacity: 1, transform: "translateY(0px)", transition: { duration: 0.16, ease: [0.23, 1, 0.32, 1] } }}
                   exit={{ opacity: 0, transform: "translateY(-4px)", transition: { duration: 0.1 } }}
                 >
-                  {appearance.effect !== "none" && (
-                    <BackgroundEffects effect={appearance.effect} playing={np?.isPlaying ?? false} radius={shaped.r} />
-                  )}
-                  <Header title={t(tab.label)} onDragStart={drag.onPointerDown} />
+                  <Header
+                    title={t(tab.label)}
+                    onDragStart={drag.onPointerDown}
+                    onMinimize={minimize}
+                    onClose={close}
+                  />
                   <div className="relative min-h-0 flex-1 overflow-clip">
                     <AnimatePresence mode="popLayout" initial={false}>
                       <motion.div
@@ -298,7 +322,6 @@ export function Notch() {
               activeTab={tab.id}
               size={size}
               geometry={shaped}
-              line={line}
             />
           </NotchShape>
         </div>
@@ -307,8 +330,18 @@ export function Notch() {
   );
 }
 
-/** Header: tool title on the left, actions + pin on the right. */
-function Header({ title, onDragStart }: { title: string; onDragStart: (e: React.PointerEvent) => void }) {
+/** Header: tool title on the left, actions + pin + minimize + close on the right. */
+function Header({
+  title,
+  onDragStart,
+  onMinimize,
+  onClose,
+}: {
+  title: string;
+  onDragStart: (e: React.PointerEvent) => void;
+  onMinimize?: () => void;
+  onClose?: () => void;
+}) {
   const isPinned = pinned.use();
   return (
     <div
@@ -332,12 +365,19 @@ function Header({ title, onDragStart }: { title: string; onDragStart: (e: React.
       </div>
       <div className="flex items-center gap-1">
         <div ref={(el) => headerSlot.set(el)} className="grid" />
-        <HeaderButton label={t("Fokus-Modus (3× klicken zum Beenden)")} onClick={() => setFocusMode(true)}>
-          <Selection size={14} weight="bold" />
-        </HeaderButton>
-        <HeaderButton label={isPinned ? t("Lösen") : t("Offen halten")} active={isPinned} onClick={togglePin}>
+        <HeaderButton label={isPinned ? "Unpin" : "Keep Open"} active={isPinned} onClick={togglePin}>
           <PushPin size={14} weight={isPinned ? "fill" : "bold"} />
         </HeaderButton>
+        {onMinimize && (
+          <HeaderButton label="Minimize" onClick={onMinimize}>
+            <Minus size={14} weight="bold" />
+          </HeaderButton>
+        )}
+        {onClose && (
+          <HeaderButton label="Close" onClick={onClose}>
+            <X size={14} weight="bold" />
+          </HeaderButton>
+        )}
       </div>
     </div>
   );
@@ -348,7 +388,13 @@ function Header({ title, onDragStart }: { title: string; onDragStart: (e: React.
  * Renders tabs in order, placing a vertical `|` separator whenever `tab.category` changes
  * (e.g. `[Overview] [Music] | [Settings]`).
  */
-function Dock({ tabs, activeId }: { tabs: NotchTab[]; activeId: string }) {
+function Dock({
+  tabs,
+  activeId,
+}: {
+  tabs: NotchTab[];
+  activeId: string;
+}) {
   const lastMainTool = useRef(tabs[0]?.id ?? "overview");
   if (activeId !== settingsTab.id) lastMainTool.current = activeId;
   const updateReady = update.use().phase === "available";
@@ -375,6 +421,7 @@ function Dock({ tabs, activeId }: { tabs: NotchTab[]; activeId: string }) {
                 if (isSettings && isActive) {
                   navigate(lastMainTool.current);
                 } else {
+                  if (isSettings) markSeen();
                   navigate(tab.id);
                 }
               }}
@@ -544,4 +591,125 @@ function isInteractive(el: EventTarget | null): boolean {
 
 function isTextField(el: EventTarget | null): boolean {
   return el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement;
+}
+
+/**
+ * Stage 2 (Peek / Minimized Tiny Island):
+ * Compact living space for BMO on the desktop.
+ * - When idle: BMO chills on the left, weather info displays on the right.
+ * - When music is active: BMO grooves with headphones on the left, track title in the middle,
+ *   and compact interactive media playback controls (Prev, Play/Pause, Next) on the right.
+ * - Clicking controls performs playback with stopPropagation (without expanding);
+ *   clicking anywhere else on the island opens Stage 3.
+ */
+function TinyIslandContent({
+  np,
+}: {
+  np: ReturnType<typeof useNowPlaying>;
+}) {
+  const forecast = useForecast();
+  const place = settings.use().weather;
+  const weather =
+    forecast && forecast !== "error"
+      ? describe(forecast.current.code, forecast.current.day)
+      : null;
+
+  const isMusic = Boolean(np && (np.isPlaying || np.title));
+
+  return (
+    <motion.div
+      key="tiny-island"
+      className="absolute inset-0 flex items-center select-none overflow-hidden"
+      style={{ paddingLeft: 46, paddingRight: 10 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1, transition: { duration: 0.16 } }}
+      exit={{ opacity: 0, transition: { duration: 0.1 } }}
+    >
+      <AnimatePresence mode="popLayout" initial={false}>
+        {isMusic && np ? (
+          <motion.div
+            key="music"
+            className="flex min-w-0 flex-1 items-center justify-between gap-2"
+            initial={{ opacity: 0, filter: "blur(4px)" }}
+            animate={{ opacity: 1, filter: "blur(0px)", transition: content.enter }}
+            exit={{ opacity: 0, filter: "blur(4px)", transition: content.exit }}
+          >
+            {/* Song title and artist */}
+            <div className="flex min-w-0 flex-1 flex-col justify-center leading-tight">
+              <span className="truncate text-xs font-semibold text-label">
+                {np.title}
+              </span>
+              {np.artist && (
+                <span className="truncate text-[10px] text-label-3">
+                  {np.artist}
+                </span>
+              )}
+            </div>
+
+            {/* Media controls */}
+            <div className="flex shrink-0 items-center gap-0.5">
+              <button
+                type="button"
+                title="Previous Track"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void media.previous();
+                }}
+                className="pressable flex size-6 items-center justify-center rounded-full text-label-2 hover:bg-white/10 hover:text-label active:scale-90 transition"
+              >
+                <SkipBack size={12} weight="fill" />
+              </button>
+              <button
+                type="button"
+                title={np.isPlaying ? "Pause" : "Play"}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void media.toggle();
+                }}
+                className="pressable flex size-6 items-center justify-center rounded-full bg-white/15 text-label hover:bg-white/25 active:scale-90 transition"
+              >
+                {np.isPlaying ? <Pause size={12} weight="fill" /> : <Play size={12} weight="fill" className="ml-0.5" />}
+              </button>
+              <button
+                type="button"
+                title="Next Track"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void media.next();
+                }}
+                className="pressable flex size-6 items-center justify-center rounded-full text-label-2 hover:bg-white/10 hover:text-label active:scale-90 transition"
+              >
+                <SkipForward size={12} weight="fill" />
+              </button>
+            </div>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="weather"
+            className="flex min-w-0 flex-1 items-center justify-end gap-1.5 pr-1 select-none"
+            initial={{ opacity: 0, filter: "blur(4px)" }}
+            animate={{ opacity: 1, filter: "blur(0px)", transition: content.enter }}
+            exit={{ opacity: 0, filter: "blur(4px)", transition: content.exit }}
+          >
+            {weather && forecast && forecast !== "error" ? (
+              <>
+                <weather.icon size={15} weight="fill" className="shrink-0 text-label" />
+                <span className="tabular text-xs font-semibold text-label">
+                  {formatTemp(forecast.current.temp)}
+                </span>
+                <span className="truncate text-[11px] text-label-3 max-w-[70px]">
+                  {weather.text}
+                </span>
+              </>
+            ) : (
+              <div className="flex items-center gap-1.5 text-caption text-label-3">
+                <SunDim size={14} weight="bold" />
+                <span className="truncate text-[11px]">{place?.name || t("BMO")}</span>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
 }

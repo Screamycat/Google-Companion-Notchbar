@@ -5,15 +5,11 @@
 //! whether the cursor is over the hit zone reported by the frontend.
 //! The `notch://hover` event replaces pointerenter/leave, because a click-through
 //! WebView no longer gets mouse events.
-//!
-//! Focus mode (`passthrough`): the window stays click-through even over the notch,
-//! so clicks reach the app below (e.g. browser tabs). Three quick clicks on the notch
-//! emit `notch://focus-exit`; only the mouse button is watched for that.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use serde::Deserialize;
 use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow};
@@ -52,8 +48,6 @@ pub struct HitState {
     pinned: Mutex<bool>,
     /// Set after show(): reapply click-through on the next poll.
     refresh: AtomicBool,
-    /// Focus mode: always click-through, no hover.
-    passthrough: AtomicBool,
 }
 
 impl HitState {
@@ -68,11 +62,6 @@ pub fn set_hit_rect(rect: HitRect, state: State<'_, HitState>) {
 }
 
 #[tauri::command]
-pub fn set_passthrough(on: bool, state: State<'_, HitState>) {
-    state.passthrough.store(on, Ordering::Relaxed);
-}
-
-#[tauri::command]
 pub fn set_pinned(pinned: bool, state: State<'_, HitState>) {
     *state.pinned.lock().unwrap() = pinned;
 }
@@ -84,9 +73,6 @@ const POLL: Duration = Duration::from_millis(16);
 /// the next poll near the notch is fast again.
 const POLL_FAR: Duration = Duration::from_millis(50);
 const FAR: f64 = 160.0;
-/// Leaving focus mode: this many clicks on the notch, each at most `CLICK_GAP` apart.
-const EXIT_CLICKS: u32 = 3;
-const CLICK_GAP: Duration = Duration::from_millis(450);
 
 pub fn spawn(app: AppHandle, window: WebviewWindow) {
     thread::spawn(move || {
@@ -97,7 +83,6 @@ pub fn spawn(app: AppHandle, window: WebviewWindow) {
         // Where the current press started; None = button up or the press began near the notch.
         let mut drag_from: Option<(f64, f64)> = None;
         let mut drag_active = false;
-        let (mut clicks, mut last_click) = (0u32, Instant::now());
         let mut far = false;
 
         loop {
@@ -117,34 +102,10 @@ pub fn spawn(app: AppHandle, window: WebviewWindow) {
             let y = (cursor.y - origin.y as f64) / scale;
             let rect = *state.rect.lock().unwrap();
             let dragging = unsafe { GetAsyncKeyState(VK_LBUTTON.0 as i32) } as u16 & 0x8000 != 0;
-            let passthrough = state.passthrough.load(Ordering::Relaxed);
-            // Edge distance to the hit zone; a held button keeps the fast poll (drags,
-            // triple click in focus mode).
+            // Edge distance to the hit zone; a held button keeps the fast poll (drags).
             let dx = (rect.x - x).max(x - (rect.x + rect.w)).max(0.0);
             let dy = (rect.y - y).max(y - (rect.y + rect.h)).max(0.0);
             far = !dragging && !was_down && dx.hypot(dy) > FAR;
-
-            if passthrough {
-                // Only count clicks (button edges), never swallow them.
-                if dragging && !was_down && rect.contains(x, y) {
-                    clicks = if last_click.elapsed() <= CLICK_GAP { clicks + 1 } else { 1 };
-                    last_click = Instant::now();
-                    if clicks >= EXIT_CLICKS {
-                        clicks = 0;
-                        let _ = window.emit("notch://focus-exit", ());
-                    }
-                }
-                was_down = dragging;
-                if last_ignore != Some(true) {
-                    let _ = window.set_ignore_cursor_events(true);
-                    last_ignore = Some(true);
-                }
-                if last_inside != Some(false) {
-                    let _ = window.emit("notch://hover", false);
-                    last_inside = Some(false);
-                }
-                continue;
-            }
             // Grow the zone only for a real drag that started away from the notch (a file
             // from Explorer). A plain click right below the notch must reach the app
             // underneath; growing on every press swallowed those clicks (issue #7).

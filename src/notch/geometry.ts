@@ -47,18 +47,23 @@ export function openGeometry(w: number, h: number, r = 30, ear = 14): NotchGeome
  * - Stage 2 (`peek`): Compact rounded island where the Companion peeks out.
  * - Stage 3 (`open`): Full dropdown menu with configurable corner & ear radii.
  */
-export function stageGeometry(notch: NotchTuning, tabSize?: { w: number; h: number }): {
+export function stageGeometry(
+  notch: NotchTuning,
+  tabSize?: { w: number; h: number },
+  isMusicActive = false
+): {
   closed: NotchGeometry;
   peek: NotchGeometry;
   open: NotchGeometry;
 } {
   const tw = clamp(Math.round(notch.triggerW), 60, 480, 180);
-  const pw = clamp(Math.round(notch.peekW), 90, 380, 164);
-  const ph = clamp(Math.round(notch.peekH), 28, 110, 48);
+  const basePw = clamp(Math.round(notch.peekW), 90, 380, 164);
+  const pw = isMusicActive ? Math.max(basePw, 280) : Math.max(basePw, 188);
+  const ph = clamp(Math.round(notch.peekH), 36, 110, 44);
   const ow = tabSize ? tabSize.w : notch.openW;
   const oh = tabSize ? tabSize.h : notch.openH;
 
-  const peekR = Math.min(24, Math.max(12, Math.round(ph * 0.42)));
+  const peekR = Math.min(24, Math.max(14, Math.round(ph * 0.44)));
   const peekEar = Math.min(12, Math.max(6, Math.round(ph * 0.22)));
 
   return {

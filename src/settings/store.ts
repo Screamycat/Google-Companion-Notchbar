@@ -61,28 +61,64 @@ export const DEFAULT_NOTCH_TUNING: NotchTuning = {
   morphDuration: 0.34,
 };
 
-export type CompanionShape = "circle" | "squircle" | "pill" | "egg";
-export type CompanionColor = "glass" | "accent" | "gemini" | "dark" | "mint" | "amber" | "coral";
+export type CompanionShape =
+  | "circle"
+  | "squircle"
+  | "pill"
+  | "egg"
+  | "scallop"
+  | "jagged-circle"
+  | "hexagon"
+  | "triangle"
+  | "tower"
+  | "elongated-rectangle"
+  | "slime";
+export type CompanionHat = "none" | "beanie" | "crown" | "halo" | "cap";
+export type CompanionEyewear = "none" | "glasses" | "shades";
+export type CompanionColor = string;
 export type CompanionEyes = "happy" | "curious" | "anime" | "cool";
 export type CompanionAccessory = "auto" | "headphones" | "beanie" | "halo" | "crown" | "none";
 
 export interface CompanionCustomization {
   name: string;
   shape: CompanionShape;
-  color: CompanionColor;
-  eyes: CompanionEyes;
-  accessory: CompanionAccessory;
+  /** Custom hex color string or preset tint */
+  color: string;
+  /** Hat accessory slot */
+  hat?: CompanionHat;
+  /** Eyewear / face accessory slot */
+  eyewear?: CompanionEyewear;
+  /** Smart accessories: auto-switches to headphones during music playback */
+  smartAccessories?: boolean;
   aura: boolean;
+  /** Music energy threshold (0-100) where companion steps up to Level 2 Groove (default 35) */
+  grooveThreshold?: number;
+  /** Music energy threshold (0-100) where companion steps up to Level 3 Hype Frenzy / Bass Drop (default 65) */
+  dropThreshold?: number;
+  // Legacy optional fields
+  grooveSensitivity?: number;
+  dropSensitivity?: number;
+  eyes?: CompanionEyes;
+  accessory?: CompanionAccessory;
 }
 
 export const DEFAULT_COMPANION: CompanionCustomization = {
-  name: "Gigi",
+  name: "BMO",
   shape: "circle",
-  color: "glass",
-  eyes: "happy",
-  accessory: "auto",
+  color: "#4285f4",
+  hat: "none",
+  eyewear: "none",
+  smartAccessories: true,
   aura: true,
+  grooveThreshold: 35,
+  dropThreshold: 65,
 };
+
+export interface ToolSetting {
+  id: string;
+  enabled: boolean;
+  category?: string;
+}
 
 export interface Settings {
   /** Open on hover or only on click (kept synced with notch.openMode). */
@@ -92,8 +128,8 @@ export interface Settings {
   notch: NotchTuning;
   /** Companion appearance, personality, and accessories. */
   companion: CompanionCustomization;
-  /** Order = order in the tool bar. */
-  tools: { id: string; enabled: boolean }[];
+  /** Order = order in the tool bar. Each tool can have a custom dock category. */
+  tools: ToolSetting[];
   /** `auto` = detected via IP (again on every start); a picked location stays. */
   weather: { name: string; lat: number; lon: number; auto?: boolean } | null;
   /**
@@ -104,7 +140,6 @@ export interface Settings {
     visibility: "always" | "hide-fullscreen";
     monitor: string | null;
     offset: number;
-    focusStyle: "dim" | "line";
     idleStyle: "notch" | "line";
     idleW: number;
     idleH: number;
@@ -149,9 +184,9 @@ const defaults: Settings = {
   hoverDelay: "normal",
   notch: { ...DEFAULT_NOTCH_TUNING },
   companion: { ...DEFAULT_COMPANION },
-  tools: TOOL_IDS.map((id) => ({ id, enabled: true })),
+  tools: TOOL_IDS.map((id) => ({ id, enabled: true, category: "main" })),
   weather: null,
-  display: { visibility: "always", monitor: null, offset: 0, focusStyle: "dim", idleStyle: "notch", idleW: 188, idleH: 30 },
+  display: { visibility: "always", monitor: null, offset: 0, idleStyle: "notch", idleW: 188, idleH: 30 },
   gaming: { mode: "off" },
   privacyDots: false,
   discord: { clientId: "" },
@@ -205,11 +240,17 @@ export const firstRun = (() => {
 
 export function normalizeSettings(s: Settings): Settings {
   const known = new Set<string>(TOOL_IDS);
-  const tools = (s.tools ?? []).filter((t) => known.has(t.id));
+  const tools: ToolSetting[] = (s.tools ?? [])
+    .filter((t) => known.has(t.id))
+    .map((t) => ({
+      id: t.id,
+      enabled: t.enabled ?? true,
+      category: t.category ?? "main",
+    }));
   for (const id of TOOL_IDS) {
     if (tools.some((t) => t.id === id)) continue;
-    if (id === "overview") tools.unshift({ id, enabled: true });
-    else tools.push({ id, enabled: true });
+    if (id === "overview") tools.unshift({ id, enabled: true, category: "main" });
+    else tools.push({ id, enabled: true, category: "main" });
   }
   const notch: NotchTuning = { ...DEFAULT_NOTCH_TUNING, ...(s.notch ?? {}) };
   return {
@@ -225,8 +266,17 @@ export function normalizeSettings(s: Settings): Settings {
     units: { ...defaults.units, ...s.units },
     presentation: { ...defaults.presentation, ...s.presentation },
     updates: { ...defaults.updates, ...s.updates },
-    appearance: { ...defaults.appearance, ...s.appearance },
-    companion: { ...DEFAULT_COMPANION, ...(s.companion ?? {}) },
+    companion: {
+      ...DEFAULT_COMPANION,
+      ...(s.companion ?? {}),
+      grooveThreshold:
+        s.companion?.grooveThreshold ??
+        (s.companion?.grooveSensitivity ? Math.round(35 / s.companion.grooveSensitivity) : 35),
+      dropThreshold:
+        s.companion?.dropThreshold ??
+        (s.companion?.dropSensitivity ? Math.round(65 / s.companion.dropSensitivity) : 65),
+    },
+    language: "en",
   };
 }
 

@@ -10,7 +10,6 @@ import { startDropListener } from "./platform/drop";
 import { clipboard } from "./platform/clipboard";
 import { settings } from "./settings/store";
 import { applyDisplay } from "./notch/drag";
-import { startFocusMode } from "./notch/focus";
 import { startSystemPolling } from "./features/system/store";
 import { startGamingWatch } from "./features/system/gaming";
 import { startDiscord } from "./features/discord/store";
@@ -21,7 +20,6 @@ import { startShowcase } from "./dev/showcase";
 if (showcase) startShowcase();
 
 startDropListener();
-startFocusMode();
 startSystemPolling();
 startGamingWatch();
 startDiscord();

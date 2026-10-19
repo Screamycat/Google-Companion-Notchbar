@@ -7,3 +7,7 @@ src-tauri/gen
 
 # Launch-video workspace (frames, renders, intermediates)
 brag-output/
+
+# Tauri updater signing keys
+*.key
+*.key.pub

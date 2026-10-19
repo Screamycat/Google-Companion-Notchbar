@@ -7,7 +7,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
-import { CaretUpDown, Eye, EyeSlash, type Icon } from "@phosphor-icons/react";
+import { CaretUpDown, Check, Eye, EyeSlash, type Icon } from "@phosphor-icons/react";
 import { popover, springs } from "../design/motion";
 import { t } from "../i18n";
 
@@ -335,9 +335,9 @@ export function Slider(props: {
  * containers don't clip it while it still counts as "inside" (outside-click close,
  * hit rect). It opens toward the side with more room and stays inside the notch.
  */
-const MENU_ROW = 28;
-const MENU_MAX = 160;
-const MENU_GAP = 4;
+const MENU_ROW = 32;
+const MENU_MAX = 260;
+const MENU_GAP = 6;
 const MENU_EDGE = 8;
 
 type MenuPos = {
@@ -370,16 +370,29 @@ export function Select<T extends string>(props: {
     const maxY =
       Math.min(bounds?.bottom ?? window.innerHeight, window.innerHeight) -
       MENU_EDGE;
-    const wanted = Math.min(MENU_MAX, props.options.length * MENU_ROW + 8);
+    const wanted = Math.min(MENU_MAX, props.options.length * MENU_ROW + 12);
     const below = maxY - trigger.bottom - MENU_GAP;
     const above = trigger.top - minY - MENU_GAP;
     const up = below < wanted && above > below;
     const room = up ? above : below;
+
+    // Minimum width of 168px ensures options never wrap or collide
+    const menuWidth = Math.max(trigger.width, 168);
+
+    // If trigger is on the right half of the screen, align menu to right edge of trigger:
+    const screenW = window.innerWidth;
+    let left = trigger.left;
+    if (trigger.right > screenW / 2) {
+      left = trigger.right - menuWidth;
+    }
+    // Clamp to ensure it never overflows screen edges:
+    left = Math.max(8, Math.min(screenW - menuWidth - 8, left));
+
     setPos({
-      left: trigger.left,
-      width: trigger.width,
+      left,
+      width: menuWidth,
       up,
-      maxHeight: Math.max(MENU_ROW + 8, Math.min(wanted, room)),
+      maxHeight: Math.max(MENU_ROW + 12, Math.min(wanted, room)),
       ...(up
         ? { bottom: window.innerHeight - trigger.top + MENU_GAP }
         : { top: trigger.bottom + MENU_GAP }),
@@ -414,12 +427,13 @@ export function Select<T extends string>(props: {
   const host = ref.current?.closest("[data-notch-hit]") ?? document.body;
   const current = props.options.find((o) => o.value === props.value);
   return (
-    <div ref={ref} className={`relative ${props.width ?? "w-28"}`}>
+    <div ref={ref} className={`relative ${props.width ?? "w-32"}`}>
       <button
+        type="button"
         onClick={() => setOpen((o) => !o)}
-        className="pressable pressable-fill flex h-7 w-full items-center justify-between gap-1 rounded-[8px] bg-fill-2 px-2 text-footnote text-label"
+        className="pressable pressable-fill flex h-7 w-full items-center justify-between gap-1.5 rounded-[8px] bg-fill-2 px-2.5 text-footnote text-label"
       >
-        <span className="truncate">{current?.label}</span>
+        <span className="truncate whitespace-nowrap">{current?.label}</span>
         <CaretUpDown
           size={11}
           weight="bold"
@@ -431,18 +445,18 @@ export function Select<T extends string>(props: {
           {open && pos && (
             <motion.div
               ref={menu}
-              className="pointer-events-auto fixed z-[60] overflow-y-auto rounded-[10px] bg-elevated p-1 shadow-[0_10px_30px_rgb(0_0_0/0.6)] ring-1 ring-separator [scrollbar-width:none]"
+              className="pointer-events-auto fixed z-[60] flex flex-col gap-0.5 overflow-y-auto rounded-[12px] bg-[#1a1a20]/95 p-1.5 shadow-[0_12px_36px_rgba(0,0,0,0.7),0_0_0_1px_rgba(255,255,255,0.12)] backdrop-blur-xl ring-1 ring-white/10 [scrollbar-width:none]"
               style={{
                 left: pos.left,
                 width: pos.width,
                 top: pos.top,
                 bottom: pos.bottom,
                 maxHeight: pos.maxHeight,
-                transformOrigin: pos.up ? "50% 100%" : "50% 0",
+                transformOrigin: pos.up ? "100% 100%" : "100% 0",
               }}
               initial={{
                 opacity: 0,
-                transform: `scale(0.96) translateY(${pos.up ? 2 : -2}px)`,
+                transform: `scale(0.96) translateY(${pos.up ? 4 : -4}px)`,
               }}
               animate={{
                 opacity: 1,
@@ -455,20 +469,33 @@ export function Select<T extends string>(props: {
                 transition: popover.exit,
               }}
             >
-              {props.options.map((o) => (
-                <button
-                  key={o.value}
-                  onClick={() => {
-                    props.onChange(o.value);
-                    setOpen(false);
-                  }}
-                  className={`flex h-7 w-full items-center rounded-[6px] px-2 text-left text-footnote hover:bg-fill-2 ${
-                    o.value === props.value ? "text-label" : "text-label-2"
-                  }`}
-                >
-                  {o.label}
-                </button>
-              ))}
+              {props.options.map((o) => {
+                const isSelected = o.value === props.value;
+                return (
+                  <button
+                    key={o.value}
+                    type="button"
+                    onClick={() => {
+                      props.onChange(o.value);
+                      setOpen(false);
+                    }}
+                    className={`flex h-8 w-full shrink-0 items-center justify-between gap-2 rounded-[8px] px-2.5 text-left text-footnote transition-colors ${
+                      isSelected
+                        ? "bg-white/12 font-medium text-label shadow-sm"
+                        : "text-label-2 hover:bg-white/8 hover:text-label"
+                    }`}
+                  >
+                    <span className="truncate whitespace-nowrap">{o.label}</span>
+                    {isSelected && (
+                      <Check
+                        size={12}
+                        weight="bold"
+                        className="shrink-0 text-white opacity-95"
+                      />
+                    )}
+                  </button>
+                );
+              })}
             </motion.div>
           )}
         </AnimatePresence>,

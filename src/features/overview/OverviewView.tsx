@@ -11,9 +11,7 @@ import {
   GearSix,
   Headphones,
   Keyboard,
-  LockSimple,
   Moon,
-  MoonStars,
   MouseSimple,
   MusicNoteSimple,
   SpeakerHigh,
@@ -23,7 +21,6 @@ import {
   SunDim,
 } from "@phosphor-icons/react";
 import { content, popover, springs } from "../../design/motion";
-import { HeaderActions, HeaderButton } from "../../notch/header";
 import { navigate } from "../../notch/nav";
 import { useNowPlaying } from "../../platform/media";
 import { bluetooth, systemControls, type BtState, type FocusState, type VolumeState } from "../../platform/services";
@@ -51,14 +48,6 @@ import { locale, t, tBackend } from "../../i18n";
 export function OverviewView() {
   return (
     <div className="flex h-full flex-col justify-between px-4 pt-1 pb-2">
-      <HeaderActions>
-        <HeaderButton label={t("Sperren")} onClick={() => void systemControls.lock()}>
-          <LockSimple size={14} weight="bold" />
-        </HeaderButton>
-        <HeaderButton label={t("Energie sparen")} onClick={() => void systemControls.sleep()}>
-          <MoonStars size={14} weight="bold" />
-        </HeaderButton>
-      </HeaderActions>
 
       <div className="grid h-full grid-cols-[1fr_auto_1fr] items-center gap-3.5">
         {/* Left Modular Column */}

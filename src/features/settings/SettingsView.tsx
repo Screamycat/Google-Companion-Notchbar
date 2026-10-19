@@ -1,20 +1,27 @@
-import { useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { Fragment, useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion, Reorder } from "motion/react";
 import {
   ArrowCounterClockwise,
   CellSignalHigh,
   Check,
   CornersOut,
-  Monitor,
+  DotsSixVertical,
+  GearSix,
+  Minus,
   MusicNoteSimple,
   Palette,
-  SlidersHorizontal,
+  Plus,
   Smiley,
+  SquaresFour,
   type Icon,
 } from "@phosphor-icons/react";
-import { springs } from "../../design/motion";
-import { autostart, display, type MonitorInfo } from "../../platform/services";
+import { useLiveMusicEnergy } from "../companion/companionBrain";
+import { fade, springs } from "../../design/motion";
+import { autostart, display, type ChangelogEntry, type MonitorInfo } from "../../platform/services";
+import { checkForUpdate, installUpdate, update } from "../../lib/update";
+import { between, changelog, itemText, markSeen, useUnseen } from "../../lib/changelog";
 import { useNowPlaying } from "../../platform/media";
+import { findTab, type NotchTab } from "../../notch/tabs";
 import {
   DEFAULT_NOTCH_TUNING,
   resetNotchTuning,
@@ -23,27 +30,30 @@ import {
   updateNotch,
   updateSettings,
   type AppearanceEffect,
-  type CompanionAccessory,
-  type CompanionColor,
-  type CompanionEyes,
+  type CompanionHat,
+  type CompanionEyewear,
   type CompanionShape,
   type Settings,
 } from "../../settings/store";
 import { Button, Group, Row, Segmented, Select, Slider, Switch } from "../../ui/controls";
-import { CompanionPreviewCard } from "../companion/CompanionSlot";
+import {
+  CompanionStage,
+  CompanionBody,
+  getShapePath,
+} from "../companion/CompanionSlot";
 import { BackgroundEffects } from "../../notch/BackgroundEffects";
 import { Equalizer } from "../now-playing/Equalizer";
 import { PlaceSearch } from "../weather/WeatherView";
 import { detectPlace } from "../weather/store";
 
-type PageId = "companion" | "appearance" | "geometry" | "timing" | "system";
+type PageId = "companion" | "appearance" | "geometry" | "tabs" | "general";
 
 const pages: { id: PageId; label: string; icon: Icon }[] = [
   { id: "companion", label: "Companion", icon: Smiley },
   { id: "appearance", label: "Appearance", icon: Palette },
-  { id: "geometry", label: "Size & Shape", icon: CornersOut },
-  { id: "timing", label: "Hover & Timing", icon: SlidersHorizontal },
-  { id: "system", label: "Display & System", icon: Monitor },
+  { id: "geometry", label: "Size & Timing", icon: CornersOut },
+  { id: "tabs", label: "Tabs", icon: SquaresFour },
+  { id: "general", label: "General", icon: GearSix },
 ];
 
 let savedPage: PageId = "companion";
@@ -112,7 +122,7 @@ export function SettingsView() {
   return (
     <div className="flex h-full gap-3 px-4 pt-1 pb-2">
       {/* Settings Navigation Sidebar */}
-      <nav className="flex w-[148px] shrink-0 flex-col justify-between">
+      <nav className="flex w-[140px] shrink-0 flex-col justify-between">
         <div className="flex flex-col gap-0.5">
           {pages.map((p) => {
             const active = p.id === page;
@@ -154,17 +164,25 @@ export function SettingsView() {
         <AnimatePresence mode="popLayout" initial={false}>
           <motion.div
             key={page}
-            className="absolute inset-0 flex flex-col gap-3.5 overflow-y-auto pr-0.5 pb-6 [scrollbar-width:none]"
-            style={{ maskImage: "linear-gradient(180deg, #000 calc(100% - 24px), transparent)" }}
+            className={
+              page === "companion"
+                ? "absolute inset-0 flex gap-3 overflow-hidden"
+                : "absolute inset-0 flex flex-col gap-3.5 overflow-y-auto pr-0.5 pb-6 [scrollbar-width:none]"
+            }
+            style={
+              page === "companion"
+                ? undefined
+                : { maskImage: "linear-gradient(180deg, #000 calc(100% - 24px), transparent)" }
+            }
             initial={{ opacity: 0 }}
             animate={{ opacity: 1, transition: { duration: 0.16 } }}
             exit={{ opacity: 0, transition: { duration: 0.1 } }}
           >
             {page === "companion" && <CompanionPage />}
             {page === "appearance" && <AppearancePage />}
-            {page === "geometry" && <GeometryPage />}
-            {page === "timing" && <TimingPage />}
-            {page === "system" && <SystemPage />}
+            {page === "geometry" && <SizeAndTimingPage />}
+            {page === "tabs" && <TabsPage />}
+            {page === "general" && <GeneralPage />}
           </motion.div>
         </AnimatePresence>
       </div>
@@ -172,121 +190,571 @@ export function SettingsView() {
   );
 }
 
-/** Page 1: Companion Customization (Name, Shape, Colors, Eyes, Accessories, Live Preview) */
+const SHAPES: { id: CompanionShape; label: string }[] = [
+  { id: "circle", label: "Circle" },
+  { id: "squircle", label: "Squircle" },
+  { id: "pill", label: "Capsule" },
+  { id: "tower", label: "Tower" },
+  { id: "triangle", label: "Triangle" },
+  { id: "hexagon", label: "Hexagon" },
+  { id: "egg", label: "Egg" },
+  { id: "scallop", label: "Scallop" },
+  { id: "slime", label: "Slime" },
+];
+
+const COMPANION_PALETTES = [
+  { color: "#4285f4", label: "Google Blue" },
+  { color: "#34a853", label: "Google Mint" },
+  { color: "#fbbc05", label: "Amber Gold" },
+  { color: "#ea4335", label: "Coral Red" },
+  { color: "#9b72cb", label: "Cosmic Purple" },
+  { color: "#ec4899", label: "Bubblegum Pink" },
+  { color: "#1e1e24", label: "Stealth Obsidian" },
+  { color: "#ffffff", label: "Frosted Glass" },
+];
+
+function ShapeGrid({
+  selected,
+  onSelect,
+}: {
+  selected: CompanionShape;
+  onSelect: (shape: CompanionShape) => void;
+}) {
+  return (
+    <div className="grid grid-cols-3 gap-1.5">
+      {SHAPES.map((s) => {
+        const isSelected =
+          selected === s.id ||
+          (s.id === "scallop" && selected === "jagged-circle") ||
+          (s.id === "tower" && selected === "elongated-rectangle");
+        return (
+          <button
+            key={s.id}
+            type="button"
+            onClick={() => onSelect(s.id)}
+            className={`pressable relative flex h-11 flex-col items-center justify-center gap-0.5 rounded-[10px] border px-1 py-1 transition-all ${
+              isSelected
+                ? "border-[var(--accent,#4285f4)] bg-fill-2 text-label shadow-[0_0_12px_color-mix(in_srgb,var(--accent,#4285f4)_25%,transparent)]"
+                : "border-white/5 bg-fill-1/50 text-label-3 hover:border-white/10 hover:bg-fill-2/60 hover:text-label-2"
+            }`}
+          >
+            <svg viewBox="0 0 100 100" className="size-4 shrink-0 overflow-visible" aria-hidden>
+              <path
+                d={getShapePath(s.id)}
+                fill={isSelected ? "var(--accent, #4285f4)" : "none"}
+                fillOpacity={isSelected ? 0.25 : 0}
+                stroke={isSelected ? "var(--accent, #4285f4)" : "currentColor"}
+                strokeWidth="8"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <span className="text-[10px] font-medium leading-none truncate max-w-full">
+              {s.label}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Page 1: Companion Customization (Live Permanent Stage + Full Controls) */
 function CompanionPage() {
   const comp = settings.use().companion;
   const { companionSize } = settings.use().notch;
 
   return (
     <>
-      {/* Interactive Live Preview */}
-      <CompanionPreviewCard />
+      {/* Permanent, interactive Companion Stage (NEVER scrolls out of view) */}
+      <CompanionStage />
 
-      {/* Identity & Aura */}
-      <Group title="Identity">
-        <Row label="Companion Name" hint="Give your dynamic companion a name">
-          <input
-            type="text"
-            value={comp.name}
-            maxLength={18}
-            placeholder="e.g. Gigi"
-            onChange={(e) => updateCompanion({ name: e.target.value })}
-            className="h-7 w-36 rounded-[8px] bg-fill-2 px-2.5 text-footnote text-label outline-none ring-1 ring-white/10 focus:ring-link"
-          />
-        </Row>
-        <Row label="Ambient Aura Glow" hint="Soft breathing halo behind the companion">
-          <Switch
-            label="Ambient Aura Glow"
-            checked={comp.aura}
-            onChange={(aura) => updateCompanion({ aura })}
-          />
-        </Row>
-      </Group>
+      {/* Scrollable Customization Controls */}
+      <div
+        className="flex-1 overflow-y-auto pr-0.5 pb-6 flex flex-col gap-3 [scrollbar-width:none]"
+        style={{ maskImage: "linear-gradient(180deg, #000 calc(100% - 20px), transparent)" }}
+      >
+        {/* Identity & Aura */}
+        <Group title="Identity">
+          <Row label="Name" hint="Personal name for your companion">
+            <input
+              type="text"
+              value={comp.name}
+              maxLength={18}
+              placeholder="e.g. BMO"
+              onChange={(e) => updateCompanion({ name: e.target.value })}
+              className="h-7 w-32 rounded-[8px] bg-fill-2 px-2.5 text-footnote text-label outline-none ring-1 ring-white/10 focus:ring-link"
+            />
+          </Row>
+          <Row label="Ambient Aura" hint="Soft breathing halo behind companion">
+            <Switch
+              label="Ambient Aura"
+              checked={comp.aura}
+              onChange={(aura) => updateCompanion({ aura })}
+            />
+          </Row>
+        </Group>
 
-      {/* Body Shape */}
-      <Group title="Body Shape">
-        <Row label="Companion Form" hint="Choose the companion's geometry (headphones adapt automatically)">
-          <Segmented<CompanionShape>
-            id="companion-shape"
-            size="sm"
-            value={comp.shape}
-            options={[
-              { value: "circle", label: "Circle" },
-              { value: "squircle", label: "Squircle" },
-              { value: "pill", label: "Capsule" },
-              { value: "egg", label: "Egg" },
-            ]}
-            onChange={(shape) => updateCompanion({ shape })}
-          />
-        </Row>
-      </Group>
+        {/* Body Shape - All 9 smooth/rounded shapes ordered common to obscure */}
+        <Group title="Body Shape">
+          <div className="px-3 pt-1 pb-2">
+            <div className="mb-2 text-[11px] text-label-3">
+              9 smooth vector forms with auto-adapting accessories:
+            </div>
+            <ShapeGrid selected={comp.shape} onSelect={(shape) => updateCompanion({ shape })} />
+          </div>
+        </Group>
 
-      {/* Color & Material */}
-      <Group title="Color & Material">
-        <Row label="Body Finish" hint="Frosted glass or Google ecosystem color tints">
-          <Select<CompanionColor>
-            value={comp.color}
-            options={[
-              { value: "glass", label: "Classic Frosted Glass" },
-              { value: "gemini", label: "Gemini Cosmic Gradient" },
-              { value: "accent", label: "Dynamic Accent Tint" },
-              { value: "dark", label: "Stealth Obsidian Glass" },
-              { value: "mint", label: "Google Mint Emerald" },
-              { value: "amber", label: "Google Amber Gold" },
-              { value: "coral", label: "Google Coral Red" },
-            ]}
-            onChange={(color) => updateCompanion({ color })}
-          />
-        </Row>
-      </Group>
+        {/* Body Color - Custom Choice */}
+        <Group title="Body Color">
+          <Row label="Color Tint" hint="Pick any custom color of your choice">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {COMPANION_PALETTES.map((p) => {
+                const isSelected = comp.color?.toLowerCase() === p.color.toLowerCase();
+                return (
+                  <ColorDot
+                    key={p.color}
+                    color={p.color}
+                    label={p.label}
+                    selected={isSelected}
+                    onPick={() => updateCompanion({ color: p.color })}
+                  />
+                );
+              })}
+              <CustomColorDot
+                value={comp.color?.startsWith("#") ? comp.color : "#4285f4"}
+                selected={
+                  !COMPANION_PALETTES.some(
+                    (p) => p.color.toLowerCase() === comp.color?.toLowerCase()
+                  )
+                }
+                onPick={(color) => updateCompanion({ color })}
+              />
+            </div>
+          </Row>
+        </Group>
 
-      {/* Eyes & Expression */}
-      <Group title="Expression">
-        <Row label="Eyes Style" hint="Facial expression when in open windows">
-          <Segmented<CompanionEyes>
-            id="companion-eyes"
-            size="sm"
-            value={comp.eyes}
-            options={[
-              { value: "happy", label: "Happy (^ ^)" },
-              { value: "curious", label: "Curious (o o)" },
-              { value: "anime", label: "Anime (★ ★)" },
-              { value: "cool", label: "Shades (■ ■)" },
-            ]}
-            onChange={(eyes) => updateCompanion({ eyes })}
+        {/* Accessories */}
+        <Group title="Accessories">
+          <Row
+            label="Smart Accessories"
+            hint="Auto-swaps hat for headphones during music playback"
+          >
+            <Switch
+              label="Smart Accessories"
+              checked={comp.smartAccessories !== false}
+              onChange={(smartAccessories) => updateCompanion({ smartAccessories })}
+            />
+          </Row>
+          <Row label="Hat" hint="Headwear slot (auto-tucked during music)">
+            <Select<CompanionHat>
+              width="w-36"
+              value={comp.hat ?? "none"}
+              options={[
+                { value: "none", label: "None (Clean)" },
+                { value: "beanie", label: "Winter Beanie Cap" },
+                { value: "crown", label: "Royal Monarch Crown" },
+                { value: "halo", label: "Angel Halo" },
+                { value: "cap", label: "Baseball Snapback Cap" },
+              ]}
+              onChange={(hat) => updateCompanion({ hat })}
+            />
+          </Row>
+          <Row label="Eyewear" hint="Face accessory slot (glasses, shades)">
+            <Select<CompanionEyewear>
+              width="w-36"
+              value={comp.eyewear ?? "none"}
+              options={[
+                { value: "none", label: "None" },
+                { value: "glasses", label: "Reading Glasses" },
+                { value: "shades", label: "Cool Sunglasses" },
+              ]}
+              onChange={(eyewear) => updateCompanion({ eyewear })}
+            />
+          </Row>
+          <SliderRow
+            label="Base Scale"
+            hint="Companion size in dropdown tabs"
+            value={companionSize}
+            min={50}
+            max={120}
+            step={2}
+            unit="px"
+            defaultValue={DEFAULT_NOTCH_TUNING.companionSize}
+            onChange={(v) => updateNotch({ companionSize: v })}
+            stacked
           />
-        </Row>
-      </Group>
+        </Group>
 
-      {/* Accessories */}
-      <Group title="Accessories">
-        <Row label="Companion Accessory" hint="Headphones adapt cleanly to any chosen body shape">
-          <Select<CompanionAccessory>
-            value={comp.accessory}
-            options={[
-              { value: "auto", label: "Smart Music (On playback)" },
-              { value: "headphones", label: "Headphones (Always on)" },
-              { value: "beanie", label: "Winter Beanie Cap" },
-              { value: "halo", label: "Golden Angel Halo" },
-              { value: "crown", label: "Royal Monarch Crown" },
-              { value: "none", label: "None (Clean)" },
-            ]}
-            onChange={(accessory) => updateCompanion({ accessory })}
-          />
-        </Row>
-        <SliderRow
-          label="Companion Size"
-          hint="Scale of the companion in open dropdown tabs"
-          value={companionSize}
-          min={50}
-          max={120}
-          step={2}
-          unit="px"
-          defaultValue={DEFAULT_NOTCH_TUNING.companionSize}
-          onChange={(v) => updateNotch({ companionSize: v })}
-        />
-      </Group>
+        {/* Music Vibing Thresholds (0-100) */}
+        <VibeThresholdsControl />
+      </div>
     </>
+  );
+}
+
+function VibeRangeBar({
+  grooveThreshold,
+  dropThreshold,
+  liveEnergy,
+}: {
+  grooveThreshold: number;
+  dropThreshold: number;
+  liveEnergy: number;
+}) {
+  const g = Math.max(5, Math.min(95, grooveThreshold));
+  const d = Math.max(g + 4, Math.min(100, dropThreshold));
+
+  const isLevel3 = liveEnergy >= d;
+  const isLevel2 = !isLevel3 && liveEnergy >= g;
+  const isLevel1 = !isLevel3 && !isLevel2;
+
+  return (
+    <div className="flex flex-col gap-1.5 px-3 pt-2 pb-1 select-none">
+      {/* Zone Legend with Dynamic Active Zone Highlight */}
+      <div className="flex items-center justify-between text-[10px] font-medium">
+        <span
+          className={`flex items-center gap-1 transition-colors ${
+            liveEnergy > 0 && isLevel1
+              ? "text-sky-300 font-bold drop-shadow-[0_0_6px_rgba(56,189,248,0.5)]"
+              : "text-sky-400/80"
+          }`}
+        >
+          <span className="size-1.5 rounded-full bg-sky-400" />
+          Level 1: 0–{g}
+        </span>
+        <span
+          className={`flex items-center gap-1 transition-colors ${
+            liveEnergy > 0 && isLevel2
+              ? "text-amber-300 font-bold drop-shadow-[0_0_6px_rgba(251,191,36,0.5)]"
+              : "text-amber-400/80"
+          }`}
+        >
+          <span className="size-1.5 rounded-full bg-amber-400" />
+          Level 2: {g}–{d}
+        </span>
+        <span
+          className={`flex items-center gap-1 transition-colors ${
+            liveEnergy > 0 && isLevel3
+              ? "text-purple-300 font-bold drop-shadow-[0_0_6px_rgba(192,132,252,0.5)]"
+              : "text-purple-400/80"
+          }`}
+        >
+          <span className="size-1.5 rounded-full bg-purple-400" />
+          Level 3: {d}–100
+        </span>
+      </div>
+
+      {/* 3-Zone Segmented Bar with Live Needle */}
+      <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-fill-2 border border-white/5 flex">
+        {/* Chill Zone */}
+        <div
+          className="h-full bg-sky-500/25 border-r border-sky-400/40 transition-[width] duration-100"
+          style={{ width: `${g}%` }}
+          title={`Level 1 Chill: 0 to ${g}`}
+        />
+        {/* Groove Zone */}
+        <div
+          className="h-full bg-amber-500/30 border-r border-amber-400/40 transition-[width] duration-100"
+          style={{ width: `${d - g}%` }}
+          title={`Level 2 Groove: ${g} to ${d}`}
+        />
+        {/* Hype Zone */}
+        <div
+          className="h-full bg-purple-500/35 transition-[width] duration-100"
+          style={{ width: `${100 - d}%` }}
+          title={`Level 3 Hype: ${d} to 100`}
+        />
+
+        {/* Live track music energy needle */}
+        {liveEnergy > 0 && (
+          <div
+            className="absolute inset-y-0 w-1 bg-white shadow-[0_0_6px_#ffffff] transition-[left] duration-75 -translate-x-1/2 pointer-events-none"
+            style={{ left: `${Math.min(100, Math.max(0, liveEnergy))}%` }}
+          />
+        )}
+      </div>
+
+      {/* Live Energy Readout & Companion Vibe State */}
+      {liveEnergy > 0 && (
+        <div className="flex items-center justify-between text-[10px] text-label-3 pt-0.5">
+          <span className="flex items-center gap-1.5">
+            <span className="size-1.5 rounded-full bg-green animate-pulse" />
+            <span>
+              Live Track Energy: <b className="text-label">{liveEnergy}</b> / 100
+            </span>
+          </span>
+          <span
+            className={`font-semibold px-2 py-0.5 rounded-full text-[10px] border transition-colors ${
+              isLevel3
+                ? "bg-purple-500/20 text-purple-300 border-purple-500/40"
+                : isLevel2
+                  ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
+                  : "bg-sky-500/20 text-sky-300 border-sky-500/40"
+            }`}
+          >
+            {isLevel3
+              ? "⚡ Level 3: Super Hype"
+              : isLevel2
+                ? "♫ Level 2: Hard Groove"
+                : "♪ Level 1: Chill Sway"}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EnhancedSlider({
+  value,
+  min,
+  max,
+  step = 1,
+  color = "#4285f4",
+  onChange,
+  label,
+}: {
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  color?: string;
+  onChange: (v: number) => void;
+  label: string;
+}) {
+  const track = useRef<HTMLDivElement>(null);
+  const ratio = Math.max(0, Math.min(1, (value - min) / (max - min)));
+
+  const updateFromPointer = (clientX: number) => {
+    if (!track.current) return;
+    const r = track.current.getBoundingClientRect();
+    const rawRatio = Math.max(0, Math.min(1, (clientX - r.left) / r.width));
+    const rawVal = min + rawRatio * (max - min);
+    const stepped = Math.round(rawVal / step) * step;
+    onChange(Math.max(min, Math.min(max, stepped)));
+  };
+
+  return (
+    <div
+      ref={track}
+      role="slider"
+      tabIndex={0}
+      aria-label={label}
+      aria-valuenow={value}
+      aria-valuemin={min}
+      aria-valuemax={max}
+      className="group relative flex h-7 w-full cursor-pointer touch-none select-none items-center outline-none"
+      onPointerDown={(e) => {
+        e.currentTarget.setPointerCapture(e.pointerId);
+        updateFromPointer(e.clientX);
+      }}
+      onPointerMove={(e) => {
+        if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+          updateFromPointer(e.clientX);
+        }
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "ArrowRight") onChange(Math.min(max, value + step));
+        if (e.key === "ArrowLeft") onChange(Math.max(min, value - step));
+      }}
+    >
+      {/* Background Track (8px) */}
+      <div className="relative h-2 w-full overflow-hidden rounded-full bg-fill-2 group-hover:bg-fill-3 transition-colors">
+        <div
+          className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-75"
+          style={{
+            width: `${ratio * 100}%`,
+            backgroundColor: color,
+          }}
+        />
+      </div>
+
+      {/* Tactile Thumb */}
+      <span
+        className="absolute top-1/2 size-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/90 bg-white shadow-[0_1px_4px_rgba(0,0,0,0.6)] transition-transform group-hover:scale-115 active:scale-95"
+        style={{ left: `${ratio * 100}%` }}
+      />
+    </div>
+  );
+}
+
+function ThresholdSliderRow({
+  label,
+  hint,
+  value,
+  min,
+  max,
+  step = 1,
+  color,
+  defaultValue,
+  onChange,
+}: {
+  label: string;
+  hint: string;
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  color?: string;
+  defaultValue: number;
+  onChange: (val: number) => void;
+}) {
+  const isModified = value !== defaultValue;
+
+  const nudge = (delta: number) => {
+    onChange(Math.max(min, Math.min(max, value + delta)));
+  };
+
+  return (
+    <div className="flex flex-col gap-1 px-3 py-2 border-t border-separator">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-body font-medium text-label truncate">{label}</span>
+          {isModified && (
+            <button
+              type="button"
+              onClick={() => onChange(defaultValue)}
+              title={`Reset to default (${defaultValue})`}
+              className="rounded bg-fill-2 px-1.5 py-0.5 text-[10px] text-label-3 hover:text-label shrink-0"
+            >
+              Reset
+            </button>
+          )}
+        </div>
+        <span
+          className="tabular shrink-0 text-right text-caption font-bold px-2 py-0.5 rounded-md"
+          style={{
+            backgroundColor: color ? `${color}20` : "rgba(255,255,255,0.08)",
+            color: color ?? "#ffffff",
+          }}
+        >
+          {value} / 100
+        </span>
+      </div>
+
+      <div className="text-[11px] text-label-3 leading-snug">{hint}</div>
+
+      <div className="flex items-center gap-2 pt-0.5">
+        {/* Decrement Button */}
+        <button
+          type="button"
+          onClick={() => nudge(-5)}
+          title="Decrease point by 5"
+          className="pressable flex size-6 shrink-0 items-center justify-center rounded-[6px] bg-fill-2 text-label-3 hover:bg-fill-3 hover:text-label active:scale-95 transition"
+        >
+          <Minus size={11} weight="bold" />
+        </button>
+
+        {/* Enhanced Smooth Slider Track */}
+        <div className="flex-1">
+          <EnhancedSlider
+            value={value}
+            min={min}
+            max={max}
+            step={step}
+            color={color}
+            onChange={onChange}
+            label={label}
+          />
+        </div>
+
+        {/* Increment Button */}
+        <button
+          type="button"
+          onClick={() => nudge(5)}
+          title="Increase point by 5"
+          className="pressable flex size-6 shrink-0 items-center justify-center rounded-[6px] bg-fill-2 text-label-3 hover:bg-fill-3 hover:text-label active:scale-95 transition"
+        >
+          <Plus size={11} weight="bold" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function VibeThresholdsControl() {
+  const comp = settings.use().companion;
+  const liveEnergy = useLiveMusicEnergy();
+
+  const groove = comp.grooveThreshold ?? 35;
+  const drop = comp.dropThreshold ?? 65;
+
+  const setGroove = (val: number) => {
+    updateCompanion({
+      grooveThreshold: val,
+      dropThreshold: Math.max(val + 4, drop),
+    });
+  };
+
+  const setDrop = (val: number) => {
+    updateCompanion({
+      dropThreshold: val,
+      grooveThreshold: Math.min(val - 4, groove),
+    });
+  };
+
+  const setPreset = (g: number, d: number) => {
+    updateCompanion({ grooveThreshold: g, dropThreshold: d });
+  };
+
+  return (
+    <Group title="Music Vibing Thresholds (0–100)">
+      {/* Presets Row */}
+      <div className="flex items-center justify-between gap-1.5 px-3 pt-2 pb-1">
+        <span className="text-[11px] font-medium text-label-3">Quick Presets:</span>
+        <div className="flex items-center gap-1">
+          {[
+            { label: "Calm", g: 45, d: 80 },
+            { label: "Balanced", g: 35, d: 65 },
+            { label: "Party", g: 25, d: 50 },
+          ].map((p) => {
+            const isActive = groove === p.g && drop === p.d;
+            return (
+              <button
+                key={p.label}
+                type="button"
+                onClick={() => setPreset(p.g, p.d)}
+                className={`pressable rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${
+                  isActive
+                    ? "bg-fill-3 text-label ring-1 ring-white/20"
+                    : "bg-fill-2 text-label-3 hover:bg-fill-3 hover:text-label-2"
+                }`}
+              >
+                {p.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Visual Multi-Zone Bar with Live Needle */}
+      <VibeRangeBar grooveThreshold={groove} dropThreshold={drop} liveEnergy={liveEnergy} />
+
+      {/* Level 2 Threshold Slider */}
+      <ThresholdSliderRow
+        label="Level 2: Groove Point"
+        hint="Energy point where BMO starts head-bobbing and rhythm grooving"
+        value={groove}
+        min={5}
+        max={92}
+        step={1}
+        color="#f59e0b"
+        defaultValue={35}
+        onChange={setGroove}
+      />
+
+      {/* Level 3 Threshold Slider */}
+      <ThresholdSliderRow
+        label="Level 3: Hype & Bass Drop"
+        hint="Energy point where BMO activates maximum excitement & bass hype"
+        value={drop}
+        min={15}
+        max={99}
+        step={1}
+        color="#a855f7"
+        defaultValue={65}
+        onChange={setDrop}
+      />
+    </Group>
   );
 }
 
@@ -428,13 +896,13 @@ function AppearancePage() {
   );
 }
 
-/** Page 3: Island Geometry & Radii */
-function GeometryPage() {
+/** Page 3: Merged Size & Timing (without spring physics & open dropdown mode) */
+function SizeAndTimingPage() {
   const n = settings.use().notch;
 
   return (
     <>
-      <Group title="Stage 2 (Peek Island)">
+      <Group title="Peek Island Dimensions">
         <SliderRow
           label="Peek Width"
           hint="Width of the compact island when hovering the top bezel"
@@ -459,7 +927,7 @@ function GeometryPage() {
         />
       </Group>
 
-      <Group title="Stage 3 (Open Dropdown)">
+      <Group title="Open Notch Dimensions">
         <SliderRow
           label="Dropdown Width"
           hint="Default width of Overview and Music windows"
@@ -508,29 +976,8 @@ function GeometryPage() {
           onChange={(earRadius) => updateNotch({ earRadius })}
         />
       </Group>
-    </>
-  );
-}
 
-/** Page 4: Hover Durations, Triggers & Spring Physics */
-function TimingPage() {
-  const n = settings.use().notch;
-
-  return (
-    <>
-      <Group title="Stage 2 → Stage 3 Interaction">
-        <Row label="Open Dropdown Mode" hint="Expand after holding hover in Peek, or require a click">
-          <Segmented
-            id="open-mode"
-            size="sm"
-            value={n.openMode}
-            options={[
-              { value: "hover", label: "Hold Hover" },
-              { value: "click", label: "Click" },
-            ]}
-            onChange={(openMode) => updateNotch({ openMode })}
-          />
-        </Row>
+      <Group title="Hover & Leave Timing">
         <SliderRow
           label="Peek Hover Duration"
           hint="How long cursor stays in Stage 2 before dropdown opens"
@@ -555,7 +1002,7 @@ function TimingPage() {
         />
       </Group>
 
-      <Group title="Stage 1 (Hidden Hover Zone)">
+      <Group title="Top Trigger Zone">
         <SliderRow
           label="Trigger Zone Width"
           hint="Invisible hit zone width at top center of screen"
@@ -586,53 +1033,163 @@ function TimingPage() {
           />
         </Row>
       </Group>
+    </>
+  );
+}
 
-      <Group title="Spring Physics">
-        <SliderRow
-          label="Open Spring Duration"
-          hint="Speed of opening dropdown expansion"
-          value={n.openDuration}
-          min={0.2}
-          max={0.7}
-          step={0.02}
-          unit="s"
-          decimals={2}
-          defaultValue={DEFAULT_NOTCH_TUNING.openDuration}
-          onChange={(openDuration) => updateNotch({ openDuration })}
-        />
-        <SliderRow
-          label="Open Spring Bounce"
-          hint="Playful overshoot bounce on open (0 = smooth, 0.4 = bouncy)"
-          value={n.openBounce}
-          min={0}
-          max={0.45}
-          step={0.02}
-          decimals={2}
-          defaultValue={DEFAULT_NOTCH_TUNING.openBounce}
-          onChange={(openBounce) => updateNotch({ openBounce })}
-        />
-        <SliderRow
-          label="Tab Morph Speed"
-          hint="Duration of size adjustments between tabs"
-          value={n.morphDuration}
-          min={0.16}
-          max={0.55}
-          step={0.02}
-          unit="s"
-          decimals={2}
-          defaultValue={DEFAULT_NOTCH_TUNING.morphDuration}
-          onChange={(morphDuration) => updateNotch({ morphDuration })}
-        />
+const GROUP_CHOICES = [
+  { value: "main", label: "Group 1" },
+  { value: "cat-2", label: "Group 2" },
+  { value: "cat-3", label: "Group 3" },
+  { value: "cat-4", label: "Group 4" },
+];
+
+/** Page 4: Tabs Arrangement, Groups & Dock Dividers */
+function TabsPage() {
+  const { tools } = settings.use();
+  const [dragging, setDragging] = useState<string | null>(null);
+
+  const updateCategory = (id: string, category: string) => {
+    updateSettings((s) => ({
+      tools: s.tools.map((t) => (t.id === id ? { ...t, category } : t)),
+    }));
+  };
+
+  const toggleTab = (id: string, enabled: boolean) => {
+    const enabledCount = tools.filter((t) => t.enabled).length;
+    if (!enabled && enabledCount <= 1) return;
+    updateSettings((s) => ({
+      tools: s.tools.map((t) => (t.id === id ? { ...t, enabled } : t)),
+    }));
+  };
+
+  // Preview elements for the dock preview banner
+  const activeTabs = tools
+    .filter((t) => t.enabled)
+    .map((t) => {
+      const base = findTab(t.id);
+      if (!base) return null;
+      return { ...base, category: t.category || base.category };
+    })
+    .filter((t): t is NotchTab => !!t);
+
+  return (
+    <>
+      <Group title="Dock Preview">
+        <div className="flex flex-col items-center justify-center gap-2 p-3 text-center">
+          <div className="flex items-center gap-1.5 rounded-[12px] border border-white/10 bg-fill-1 px-4 py-2">
+            {activeTabs.map((tab, idx) => {
+              const prev = idx > 0 ? activeTabs[idx - 1].category : tab.category;
+              const showDivider = idx > 0 && prev !== tab.category;
+              const I = tab.icon;
+              return (
+                <Fragment key={tab.id}>
+                  {showDivider && <span aria-hidden className="mx-1 h-3.5 w-px bg-separator" />}
+                  <span className="flex items-center gap-1 rounded-[8px] bg-fill-2 px-2.5 py-1 text-footnote font-medium text-label">
+                    <I size={13} weight="bold" />
+                    <span>{tab.label}</span>
+                  </span>
+                </Fragment>
+              );
+            })}
+            <span aria-hidden className="mx-1 h-3.5 w-px bg-separator" />
+            <span className="flex items-center gap-1 rounded-[8px] bg-fill-2/50 px-2 py-1 text-footnote text-label-3">
+              <GearSix size={13} weight="bold" />
+              <span>Settings</span>
+            </span>
+          </div>
+          <p className="text-[11px] text-label-3">
+            Tabs with matching groups sit together. Different groups are separated by a <code className="rounded bg-fill-2 px-1 text-label font-mono">|</code> divider. Drag tabs vertically to reorder.
+          </p>
+        </div>
+      </Group>
+
+      <Group title="Dock Tabs">
+        <Reorder.Group
+          as="div"
+          axis="y"
+          values={tools.map((t) => t.id)}
+          onReorder={(ids: string[]) => {
+            updateSettings((cur) => ({
+              tools: ids.map((id) => cur.tools.find((t) => t.id === id)!),
+            }));
+          }}
+          className="divide-y divide-separator"
+        >
+          {tools.map((tool) => {
+            const meta = findTab(tool.id);
+            if (!meta) return null;
+            const I = meta.icon;
+            const category = tool.category || "main";
+            const isDraggingThis = dragging === tool.id;
+
+            return (
+              <Reorder.Item
+                key={tool.id}
+                value={tool.id}
+                as="div"
+                transition={springs.snappy}
+                onDragStart={() => setDragging(tool.id)}
+                onDragEnd={() => setDragging(null)}
+                whileDrag={{ scale: 1.02 }}
+                className={`group relative flex items-center justify-between gap-3 px-3 py-2.5 cursor-grab active:cursor-grabbing select-none transition-colors ${
+                  isDraggingThis
+                    ? "z-10 rounded-[10px] bg-elevated shadow-[0_6px_18px_rgb(0_0_0/0.45)] ring-1 ring-white/10"
+                    : "hover:bg-fill-1/40"
+                }`}
+              >
+                <div className="flex items-center gap-2.5 min-w-0 pointer-events-none">
+                  <DotsSixVertical
+                    size={16}
+                    weight="bold"
+                    className="text-label-4 shrink-0 transition-colors group-hover:text-label-2"
+                  />
+                  <div className="flex size-7 shrink-0 items-center justify-center rounded-[8px] bg-fill-2 text-label">
+                    <I size={15} weight="bold" />
+                  </div>
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-body font-medium truncate">{meta.label}</span>
+                    <span className="text-[11px] text-label-3">
+                      {GROUP_CHOICES.find((c) => c.value === category)?.label ?? "Group 1"}
+                    </span>
+                  </div>
+                </div>
+
+                <div
+                  className="flex items-center gap-2 shrink-0"
+                  onPointerDown={(e) => e.stopPropagation()}
+                >
+                  {/* Group Selector */}
+                  <Select
+                    value={category}
+                    options={GROUP_CHOICES}
+                    onChange={(cat) => updateCategory(tool.id, cat)}
+                  />
+
+                  {/* Enable Switch */}
+                  <Switch
+                    label={meta.label}
+                    checked={tool.enabled}
+                    onChange={(on) => toggleTab(tool.id, on)}
+                  />
+                </div>
+              </Reorder.Item>
+            );
+          })}
+        </Reorder.Group>
       </Group>
     </>
   );
 }
 
-/** Page 5: Display Selection, Autostart & Weather */
-function SystemPage() {
+/** Page 5: General System Settings, Display & Updates */
+function GeneralPage() {
   const s = settings.use();
   const [monitors, setMonitors] = useState<MonitorInfo[]>([]);
   const [isAutostart, setIsAutostart] = useState(false);
+  const u = update.use();
+  const unseen = useUnseen();
+  const [showLog, setShowLog] = useState(false);
 
   useEffect(() => {
     void display.monitors().then(setMonitors).catch(() => {});
@@ -646,6 +1203,16 @@ function SystemPage() {
       label: `${m.name}${m.primary ? " (Primary)" : ""} — ${m.width}×${m.height}`,
     })),
   ];
+
+  const busy = u.phase === "checking" || u.phase === "downloading";
+  const statusText = {
+    idle: u.checkedAt ? `Last checked ${new Date(u.checkedAt).toLocaleTimeString()}` : "Not checked yet",
+    checking: "Checking for updates…",
+    current: "Up to date",
+    available: `Update available: v${u.version}`,
+    downloading: `Downloading update… ${Math.round(u.progress * 100)}%`,
+    error: "Check failed (no release or network error)",
+  }[u.phase];
 
   return (
     <>
@@ -699,7 +1266,95 @@ function SystemPage() {
           <PlaceSearch compact canCancel={false} onDone={() => {}} />
         </div>
       </Group>
+
+      <Group title="Updates & Releases">
+        <Row
+          label={`Version v${u.current ?? "1.7.0"}`}
+          hint={statusText}
+        >
+          <Button disabled={busy} onClick={() => void checkForUpdate()}>
+            {busy ? "Checking…" : "Check for Updates"}
+          </Button>
+        </Row>
+        <AnimatePresence initial={false}>
+          {(u.phase === "available" || u.phase === "downloading") && u.version && (
+            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} transition={fade} className="overflow-hidden">
+              <Row label={`Version v${u.version} available`} hint="Downloads and restarts automatically">
+                {u.phase === "downloading" ? (
+                  <div className="h-1.5 w-28 overflow-hidden rounded-full bg-fill-2">
+                    <div className="h-full origin-left rounded-full bg-label transition-transform duration-150 ease-linear" style={{ transform: `scaleX(${u.progress})` }} />
+                  </div>
+                ) : (
+                  <Button primary onClick={() => void installUpdate()}>
+                    Update now
+                  </Button>
+                )}
+              </Row>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        <Row
+          label={
+            <span className="flex items-center gap-1.5">
+              <span>What's New</span>
+              {unseen.length > 0 && !showLog && <span className="size-[7px] rounded-full bg-link" />}
+            </span>
+          }
+          hint={unseen.length > 0 ? `${unseen.length} new update notes available` : undefined}
+        >
+          <Button
+            onClick={() => {
+              if (!showLog) markSeen();
+              setShowLog((v) => !v);
+            }}
+          >
+            {showLog ? "Hide" : "View"}
+          </Button>
+        </Row>
+        <AnimatePresence initial={false}>
+          {showLog && (
+            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} transition={fade} className="overflow-hidden">
+              <ChangelogList entries={between(changelog, null, u.current ?? changelog[0].version)} />
+            </motion.div>
+          )}
+        </AnimatePresence>
+        <Row label="Check Automatically" hint="Checks GitHub once daily in the background">
+          <Switch
+            label="Check Automatically"
+            checked={s.updates.auto}
+            onChange={(auto) => updateSettings({ updates: { auto } })}
+          />
+        </Row>
+      </Group>
     </>
+  );
+}
+
+function ChangelogList({ entries }: { entries: ChangelogEntry[] }) {
+  return (
+    <div className="flex flex-col gap-3 px-3 pt-1 pb-3">
+      {entries.map((e, i) => (
+        <motion.div
+          key={e.version}
+          initial={{ opacity: 0, transform: "translateY(4px)" }}
+          animate={{ opacity: 1, transform: "translateY(0px)", transition: { delay: i * 0.03 } }}
+          className="flex flex-col gap-1 border-t border-separator pt-2 first:border-0 first:pt-0"
+        >
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="text-body font-semibold">v{e.version}</span>
+            <span className="text-caption text-label-3">{e.date}</span>
+          </div>
+          <ul className="flex flex-col gap-1 text-caption text-label-2">
+            {e.items.map((item, j) => (
+              <li key={j} className="flex gap-1.5">
+                <span className="text-label-4">•</span>
+                <span className="flex-1">{itemText(item)}</span>
+              </li>
+            ))}
+          </ul>
+        </motion.div>
+      ))}
+    </div>
   );
 }
 
@@ -715,10 +1370,50 @@ function SliderRow(props: {
   decimals?: number;
   defaultValue: number;
   onChange: (v: number) => void;
+  stacked?: boolean;
 }) {
   const formatted =
     props.decimals !== undefined ? props.value.toFixed(props.decimals) : String(Math.round(props.value));
   const isModified = Math.abs(props.value - props.defaultValue) > 0.001;
+
+  if (props.stacked) {
+    return (
+      <div className="flex flex-col gap-1.5 px-3 py-2.5">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="text-body font-medium text-label truncate">{props.label}</span>
+            {isModified && (
+              <button
+                type="button"
+                onClick={() => props.onChange(props.defaultValue)}
+                title={`Reset to default (${props.defaultValue}${props.unit ? ` ${props.unit}` : ""})`}
+                className="rounded bg-fill-2 px-1.5 py-0.5 text-[10px] text-label-3 hover:text-label shrink-0"
+              >
+                Reset
+              </button>
+            )}
+          </div>
+          <span className="tabular shrink-0 text-right text-caption font-semibold text-label-2">
+            {formatted}
+            {props.unit ? ` ${props.unit}` : ""}
+          </span>
+        </div>
+        {props.hint && (
+          <div className="text-caption text-label-3 leading-snug">{props.hint}</div>
+        )}
+        <div className="pt-0.5">
+          <Slider
+            label={props.label}
+            value={props.value}
+            min={props.min}
+            max={props.max}
+            step={props.step}
+            onChange={props.onChange}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <Row
@@ -727,8 +1422,9 @@ function SliderRow(props: {
           <span>{props.label}</span>
           {isModified && (
             <button
+              type="button"
               onClick={() => props.onChange(props.defaultValue)}
-              title={`Reset to default (${props.defaultValue}${props.unit ?? ""})`}
+              title={`Reset to default (${props.defaultValue}${props.unit ? ` ${props.unit}` : ""})`}
               className="rounded bg-fill-2 px-1.5 py-0.5 text-[10px] text-label-3 hover:text-label"
             >
               Reset
@@ -758,7 +1454,9 @@ function SliderRow(props: {
 
 /** Live miniature of the island showing resting color, expanded notch, and active background effect */
 function IslandPreview() {
-  const a = settings.use().appearance;
+  const s = settings.use();
+  const a = s.appearance;
+  const comp = s.companion;
   const np = useNowPlaying();
 
   return (
@@ -791,6 +1489,10 @@ function IslandPreview() {
           <div className="flex flex-col">
             <span className="text-[11px] font-semibold text-label">Google NotchBar</span>
             <span className="text-[10px] text-label-3">Live Island Preview</span>
+          </div>
+          {/* Mini Companion sitting inside the preview */}
+          <div className="relative flex size-8 shrink-0 items-center justify-center">
+            <CompanionBody shape={comp.shape} color={comp.color} />
           </div>
           <span
             className="flex size-6 items-center justify-center rounded-full text-caption"

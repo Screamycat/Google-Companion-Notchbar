@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Google NotchBar",
-  "version": "1.7.0",
+  "productName": "Google-Companion Notchbar",
+  "version": "0.0.1",
   "identifier": "app.notch.windows",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -14,7 +14,7 @@
     "windows": [
       {
         "label": "notch",
-        "title": "Google NotchBar",
+        "title": "Google-Companion Notchbar",
         "width": 760,
         "height": 560,
         "x": 0,
@@ -51,9 +51,9 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDU1QTZEN0UyREI1MTk0ODgKUldTSWxGSGI0dGVtVmYvUFpvY2gvaDY0QmxlNkhkdkhTNjRDOG1mRmREc05ybWozU3RJQVFqSGgK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEFGRjFDOUNBQTJDNzBCRkYKUldUL0M4ZWl5c254cnhYRGV5OXNCbDBPNWMzR3FRRzFESk9LZXBlcXg0OHgvOGJobHlDOWU3SnkK",
       "endpoints": [
-        "https://github.com/45thhokage/L4-Windows-NotchBar/releases/latest/download/latest.json"
+        "https://github.com/Screamycat/Google-NotchBar/releases/latest/download/latest.json"
       ],
       "windows": {
         "installMode": "passive"

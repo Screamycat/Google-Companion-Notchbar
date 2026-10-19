@@ -5,9 +5,6 @@ import { artwork as artworkSwap, content, springs } from "../../design/motion";
 import { useSmoothArtwork } from "./artwork";
 import { livePosition, media, useNowPlaying, type NowPlaying } from "../../platform/media";
 import { holdOpen } from "../../notch/useNotchState";
-import { requestSize } from "../../notch/size";
-import { settings } from "../../settings/store";
-import { MIXER_MAX_ROWS, MIXER_ROW, MixerList, MixerToggle, useMixer } from "./Mixer";
 import { Equalizer } from "./Equalizer";
 import { CompanionSlot } from "../companion/CompanionSlot";
 import { t } from "../../i18n";
@@ -15,22 +12,11 @@ import { t } from "../../i18n";
 /**
  * Music tab (`NowPlayingView`):
  * Companion sits on the left side (`variant="music"`), animating smoothly from
- * his center perch in Overview. Playback controls, artwork, equalizer, and mixer
+ * his center perch in Overview. Playback controls, artwork, and equalizer
  * sit to his right.
  */
 export function NowPlayingView() {
   const np = useNowPlaying();
-  const mix = useMixer();
-  const [mixerOpen, setMixerOpen] = useState(false);
-  const source = mix.source?.name;
-  const { openW, openH } = settings.use().notch;
-
-  const rows = Math.min(MIXER_MAX_ROWS, (mix.system ? 1 : 0) + Math.max(1, mix.apps.length));
-  useEffect(() => {
-    if (!mixerOpen || !np) return requestSize("media", null);
-    requestSize("media", { w: openW, h: openH + rows * MIXER_ROW + 14 });
-  }, [mixerOpen, rows, !!np, openW, openH]);
-  useEffect(() => () => requestSize("media", null), []);
 
   return (
     <div className="flex h-full flex-col px-5 pt-1 pb-2">
@@ -50,7 +36,7 @@ export function NowPlayingView() {
             <div className="flex items-center gap-3">
               <button
                 onClick={() => void media.openSource()}
-                title={source ? t("In {app} öffnen", { app: source }) : t("App öffnen")}
+                title={t("App öffnen")}
                 className="group/source pressable flex min-w-0 flex-1 items-center gap-3 rounded-[12px] text-left"
               >
                 <Artwork np={np} />
@@ -71,17 +57,12 @@ export function NowPlayingView() {
               <Equalizer playing={np.isPlaying} height={16} />
             </div>
             <Progress np={np} />
-            <div className="mt-2 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-              <div />
+            <div className="mt-2 flex items-center justify-center">
               <Controls playing={np.isPlaying} />
-              <div className="flex min-w-0 justify-end">
-                <MixerToggle open={mixerOpen} onToggle={() => setMixerOpen((o) => !o)} />
-              </div>
             </div>
           </div>
         )}
       </div>
-      <AnimatePresence>{mixerOpen && np && <MixerList key="mixer" data={mix} />}</AnimatePresence>
     </div>
   );
 }

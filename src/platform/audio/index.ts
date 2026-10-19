@@ -10,26 +10,39 @@ type Listener = (levels: Levels) => void;
  * Capture only runs while at least one visible equalizer asks for it.
  */
 const listeners = new Set<Listener>();
-let wanted = 0;
-let unlisten: Promise<() => void> | null = null;
+let unlistenPromise: Promise<() => void> | null = null;
+let stopTimer: number | null = null;
 
 export const audioLevelsAvailable = isNative;
 
 export function subscribeLevels(listener: Listener): () => void {
   if (!isNative) return () => {};
   listeners.add(listener);
-  wanted++;
-  if (wanted === 1) {
-    unlisten = listen<Levels>("audio://levels", (e) => listeners.forEach((l) => l(e.payload)));
-    void invoke("audio_levels", { enabled: true });
+
+  if (stopTimer !== null) {
+    window.clearTimeout(stopTimer);
+    stopTimer = null;
   }
+
+  if (!unlistenPromise) {
+    unlistenPromise = listen<Levels>("audio://levels", (e) => {
+      listeners.forEach((l) => l(e.payload));
+    });
+  }
+  void invoke("audio_levels", { enabled: true });
+
   return () => {
     listeners.delete(listener);
-    wanted--;
-    if (wanted === 0) {
-      void invoke("audio_levels", { enabled: false });
-      void unlisten?.then((f) => f());
-      unlisten = null;
+    if (listeners.size === 0 && stopTimer === null) {
+      stopTimer = window.setTimeout(() => {
+        stopTimer = null;
+        if (listeners.size === 0) {
+          void invoke("audio_levels", { enabled: false });
+          const p = unlistenPromise;
+          unlistenPromise = null;
+          void p?.then((f) => f());
+        }
+      }, 1000);
     }
   };
 }
