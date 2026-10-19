@@ -23,7 +23,9 @@ use std::sync::Mutex;
 use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{App, AppHandle, Emitter, Manager, State, WebviewWindow};
-use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
+use tauri_plugin_autostart::MacosLauncher;
+#[cfg(not(windows))]
+use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, SetForegroundWindow};
@@ -141,7 +143,7 @@ pub fn run() {
             Ok(())
         })
         .run(tauri::generate_context!())
-        .expect("failed to start Google NotchBar");
+        .expect("failed to start Google-Companion Notchbar");
 }
 
 /// Window that was in the foreground before the shortcut opened the notch.
@@ -168,15 +170,120 @@ fn keyboard_focus(focus: bool, window: WebviewWindow, state: State<'_, FocusStat
     }
 }
 
+#[cfg(windows)]
+mod autostart_win {
+    use std::env::current_exe;
+    use windows_registry::{CURRENT_USER, Type};
+
+    const RUN_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
+    const TASK_MGR_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run";
+    const APP_NAME: &str = "Google-Companion Notchbar";
+    const LEGACY_NAMES: &[&str] = &["Google NotchBar", "L4-Notchbar", "notch"];
+    const ENABLED_BYTES: [u8; 12] = [0x02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+
+    pub fn is_enabled() -> bool {
+        CURRENT_USER
+            .open(RUN_KEY)
+            .and_then(|k| k.get_string(APP_NAME))
+            .is_ok()
+    }
+
+    pub fn set(enabled: bool) -> Result<(), String> {
+        if enabled {
+            enable()
+        } else {
+            disable()
+        }
+    }
+
+    pub fn enable() -> Result<(), String> {
+        let exe = current_exe().map_err(|e| e.to_string())?;
+        let quoted_path = format!("\"{}\"", exe.display());
+        let run_key = CURRENT_USER.create(RUN_KEY).map_err(|e| e.to_string())?;
+        run_key.set_string(APP_NAME, &quoted_path).map_err(|e| e.to_string())?;
+
+        // Clean up legacy keys
+        for &legacy in LEGACY_NAMES {
+            let _ = run_key.remove_value(legacy);
+        }
+
+        // Also ensure Task Manager hasn't marked it disabled in StartupApproved
+        if let Ok(task_key) = CURRENT_USER.create(TASK_MGR_KEY) {
+            let _ = task_key.set_bytes(APP_NAME, Type::Bytes, &ENABLED_BYTES);
+            for &legacy in LEGACY_NAMES {
+                let _ = task_key.remove_value(legacy);
+            }
+        }
+        Ok(())
+    }
+
+    pub fn disable() -> Result<(), String> {
+        if let Ok(run_key) = CURRENT_USER.options().write().open(RUN_KEY) {
+            let _ = run_key.remove_value(APP_NAME);
+            for &legacy in LEGACY_NAMES {
+                let _ = run_key.remove_value(legacy);
+            }
+        }
+        if let Ok(task_key) = CURRENT_USER.options().write().open(TASK_MGR_KEY) {
+            let _ = task_key.remove_value(APP_NAME);
+            for &legacy in LEGACY_NAMES {
+                let _ = task_key.remove_value(legacy);
+            }
+        }
+        Ok(())
+    }
+
+    /// If autostart was previously registered without quotation marks or under an old name,
+    /// fix it so that Windows can execute it on reboot.
+    pub fn fix_if_needed() {
+        if let Ok(run_key) = CURRENT_USER.open(RUN_KEY) {
+            let val = run_key.get_string(APP_NAME);
+            let has_legacy = LEGACY_NAMES.iter().any(|&n| run_key.get_string(n).is_ok());
+
+            if let Ok(path) = val {
+                if !path.starts_with('"') || has_legacy {
+                    let _ = enable();
+                }
+            } else if has_legacy {
+                let _ = enable();
+            }
+        }
+    }
+}
+
+fn autostart_is_enabled(app: &AppHandle) -> bool {
+    #[cfg(windows)]
+    {
+        let _ = app;
+        autostart_win::is_enabled()
+    }
+    #[cfg(not(windows))]
+    {
+        app.autolaunch().is_enabled().unwrap_or(false)
+    }
+}
+
+fn autostart_set_internal(enabled: bool, app: &AppHandle) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        let _ = app;
+        autostart_win::set(enabled)
+    }
+    #[cfg(not(windows))]
+    {
+        let manager = app.autolaunch();
+        if enabled { manager.enable() } else { manager.disable() }.map_err(|e| e.to_string())
+    }
+}
+
 #[tauri::command]
 fn autostart_get(app: AppHandle) -> bool {
-    app.autolaunch().is_enabled().unwrap_or(false)
+    autostart_is_enabled(&app)
 }
 
 #[tauri::command]
 fn autostart_set(enabled: bool, app: AppHandle) -> Result<(), String> {
-    let manager = app.autolaunch();
-    if enabled { manager.enable() } else { manager.disable() }.map_err(|e| e.to_string())
+    autostart_set_internal(enabled, &app)
 }
 
 /// Enables autostart on the very first launch; after that the tray check and settings decide.
@@ -184,9 +291,11 @@ fn enable_autostart_once(app: &AppHandle) {
     let Ok(dir) = app.path().app_data_dir() else { return };
     let marker = dir.join("autostart-initialized");
     if marker.exists() {
+        #[cfg(windows)]
+        autostart_win::fix_if_needed();
         return;
     }
-    if app.autolaunch().enable().is_ok() {
+    if autostart_set_internal(true, app).is_ok() {
         let _ = std::fs::create_dir_all(&dir);
         let _ = std::fs::write(marker, "");
     }
@@ -205,11 +314,11 @@ struct TrayItems(Mutex<Option<Tray>>);
 
 /// Open (shortcut right-aligned via tab, like Windows menus), settings, autostart, quit.
 fn tray_texts(lang: &str) -> [String; 4] {
-    if lang == "en" {
-        let keys = SHORTCUT_LABEL.replace("Strg", "Ctrl").replace("Leertaste", "Space");
-        [format!("Open Google NotchBar\t{keys}"), "Settings …".into(), "Start with Windows".into(), "Quit Google NotchBar".into()]
+    if lang == "de" {
+        [format!("Google-Companion Notchbar öffnen\t{SHORTCUT_LABEL}"), "Einstellungen …".into(), "Mit Windows starten".into(), "Google-Companion Notchbar beenden".into()]
     } else {
-        [format!("Google NotchBar öffnen\t{SHORTCUT_LABEL}"), "Einstellungen …".into(), "Mit Windows starten".into(), "Google NotchBar beenden".into()]
+        let keys = SHORTCUT_LABEL.replace("Strg", "Ctrl").replace("Leertaste", "Space");
+        [format!("Open Google-Companion Notchbar\t{keys}"), "Settings …".into(), "Start with Windows".into(), "Quit Google-Companion Notchbar".into()]
     }
 }
 
@@ -248,8 +357,8 @@ fn dark_menus() {
 /// Left click opens the notch, right click shows the menu.
 fn build_tray(app: &App) -> tauri::Result<()> {
     dark_menus();
-    let enabled = app.autolaunch().is_enabled().unwrap_or(false);
-    let [open_text, settings_text, autostart_text, quit_text] = tray_texts("de");
+    let enabled = autostart_is_enabled(app.handle());
+    let [open_text, settings_text, autostart_text, quit_text] = tray_texts("en");
     let open = MenuItem::with_id(app, "open", open_text, true, None::<&str>)?;
     let settings = MenuItem::with_id(app, "settings", settings_text, true, None::<&str>)?;
     let autostart = CheckMenuItem::with_id(app, "autostart", autostart_text, true, enabled, None::<&str>)?;
@@ -268,7 +377,7 @@ fn build_tray(app: &App) -> tauri::Result<()> {
     let autostart_item = autostart.clone();
     TrayIconBuilder::new()
         .icon(app.default_window_icon().unwrap().clone())
-        .tooltip("Google NotchBar")
+        .tooltip("Google-Companion Notchbar")
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_tray_icon_event(|tray, event| {
@@ -287,8 +396,7 @@ fn build_tray(app: &App) -> tauri::Result<()> {
             "autostart" => {
                 // The check item toggles itself on click; read the new state.
                 let on = autostart_item.is_checked().unwrap_or(false);
-                let manager = app.autolaunch();
-                let _ = if on { manager.enable() } else { manager.disable() };
+                let _ = autostart_set_internal(on, app);
             }
             _ => {}
         })

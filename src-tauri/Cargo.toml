@@ -40,6 +40,7 @@ tauri-plugin-process = "2"
 
 [target.'cfg(windows)'.dependencies]
 webview2-com = "0.39"
+windows-registry = "0.6"
 windows = { version = "0.62", features = [
   "Win32_Devices_Bluetooth",
   "Devices_Bluetooth",
