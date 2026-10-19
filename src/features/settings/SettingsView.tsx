@@ -203,6 +203,7 @@ const SHAPES: { id: CompanionShape; label: string }[] = [
 ];
 
 const COMPANION_PALETTES = [
+  { color: "#ffffff", label: "Pure White" },
   { color: "#4285f4", label: "Google Blue" },
   { color: "#34a853", label: "Google Mint" },
   { color: "#fbbc05", label: "Amber Gold" },
@@ -210,7 +211,6 @@ const COMPANION_PALETTES = [
   { color: "#9b72cb", label: "Cosmic Purple" },
   { color: "#ec4899", label: "Bubblegum Pink" },
   { color: "#1e1e24", label: "Stealth Obsidian" },
-  { color: "#ffffff", label: "Frosted Glass" },
 ];
 
 function ShapeGrid({
@@ -280,7 +280,7 @@ function CompanionPage() {
               type="text"
               value={comp.name}
               maxLength={18}
-              placeholder="e.g. BMO"
+              placeholder="Companion"
               onChange={(e) => updateCompanion({ name: e.target.value })}
               className="h-7 w-32 rounded-[8px] bg-fill-2 px-2.5 text-footnote text-label outline-none ring-1 ring-white/10 focus:ring-link"
             />

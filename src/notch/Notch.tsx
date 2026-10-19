@@ -608,7 +608,9 @@ function TinyIslandContent({
   np: ReturnType<typeof useNowPlaying>;
 }) {
   const forecast = useForecast();
-  const place = settings.use().weather;
+  const s = settings.use();
+  const place = s.weather;
+  const comp = s.companion;
   const weather =
     forecast && forecast !== "error"
       ? describe(forecast.current.code, forecast.current.day)
@@ -704,7 +706,7 @@ function TinyIslandContent({
             ) : (
               <div className="flex items-center gap-1.5 text-caption text-label-3">
                 <SunDim size={14} weight="bold" />
-                <span className="truncate text-[11px]">{place?.name || t("BMO")}</span>
+                <span className="truncate text-[11px]">{place?.name || comp.name || "Companion"}</span>
               </div>
             )}
           </motion.div>

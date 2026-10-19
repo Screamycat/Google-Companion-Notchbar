@@ -103,9 +103,9 @@ export interface CompanionCustomization {
 }
 
 export const DEFAULT_COMPANION: CompanionCustomization = {
-  name: "BMO",
+  name: "Companion",
   shape: "circle",
-  color: "#4285f4",
+  color: "#ffffff",
   hat: "none",
   eyewear: "none",
   smartAccessories: true,

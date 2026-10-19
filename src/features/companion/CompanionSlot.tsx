@@ -687,7 +687,7 @@ export function NotchCompanion({ status, activeTab, size, geometry, line }: Notc
       className="pointer-events-none absolute select-none"
       style={{ left: "50%", top: 0 }}
       data-companion-container="notch"
-      data-companion-name={comp.name || "BMO"}
+      data-companion-name={comp.name || "Companion"}
       animate={{
         x: targetX,
         y: targetY,
@@ -1900,7 +1900,7 @@ export function CompanionStage({
       {/* Bottom Name & Dynamic Hint */}
       <div className="relative z-10 flex flex-col items-center gap-0.5 text-center">
         <span className="text-body font-semibold text-label truncate max-w-[114px]">
-          {comp.name || "BMO"}
+          {comp.name || "Companion"}
         </span>
         <span
           className={`text-[10px] transition-colors ${
