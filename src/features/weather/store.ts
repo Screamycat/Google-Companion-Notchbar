@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import {
   Cloud,
   CloudFog,
@@ -12,6 +11,7 @@ import {
   type Icon,
 } from "@phosphor-icons/react";
 import { settings, updateSettings } from "../../settings/store";
+import { createStore } from "../../lib/store";
 import { lang, t } from "../../i18n";
 
 /*
@@ -37,34 +37,48 @@ export function describe(code: number, day = true): { icon: Icon; text: string }
 }
 
 const cache = new Map<string, { at: number; data: Forecast }>();
+const inFlight = new Map<string, Promise<Forecast>>();
 
 export async function loadForecast(lat: number, lon: number): Promise<Forecast> {
   const key = `${lat},${lon}`;
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < 10 * 60_000) return hit.data;
+  if (inFlight.has(key)) return inFlight.get(key)!;
+
   const url =
     `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
     "&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,is_day" +
     "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&forecast_days=7";
-  const r = await (await fetch(url)).json();
-  const data: Forecast = {
-    current: {
-      temp: r.current.temperature_2m,
-      feels: r.current.apparent_temperature,
-      code: r.current.weather_code,
-      wind: r.current.wind_speed_10m,
-      day: r.current.is_day === 1,
-    },
-    daily: r.daily.time.map((date: string, i: number) => ({
-      date,
-      code: r.daily.weather_code[i],
-      max: r.daily.temperature_2m_max[i],
-      min: r.daily.temperature_2m_min[i],
-      rain: r.daily.precipitation_probability_max[i] ?? 0,
-    })),
-  };
-  cache.set(key, { at: Date.now(), data });
-  return data;
+
+  const p = (async () => {
+    try {
+      const res = await fetch(url);
+      const r = await res.json();
+      const data: Forecast = {
+        current: {
+          temp: r.current.temperature_2m,
+          feels: r.current.apparent_temperature,
+          code: r.current.weather_code,
+          wind: r.current.wind_speed_10m,
+          day: r.current.is_day === 1,
+        },
+        daily: r.daily.time.map((date: string, i: number) => ({
+          date,
+          code: r.daily.weather_code[i],
+          max: r.daily.temperature_2m_max[i],
+          min: r.daily.temperature_2m_min[i],
+          rain: r.daily.precipitation_probability_max[i] ?? 0,
+        })),
+      };
+      cache.set(key, { at: Date.now(), data });
+      return data;
+    } finally {
+      inFlight.delete(key);
+    }
+  })();
+
+  inFlight.set(key, p);
+  return p;
 }
 
 export interface Place {
@@ -127,24 +141,54 @@ export function detectPlace(force = false): Promise<boolean> {
   return detecting;
 }
 
+/** Shared singleton store for the weather forecast across the entire application. */
+export const forecastStore = createStore<Forecast | null | "error">(null);
+
+let activeSyncKey: string | null = null;
+
+export function syncWeatherForecast() {
+  const place = settings.get().weather;
+  if (!place) {
+    if (forecastStore.get() !== null) forecastStore.set(null);
+    void detectPlace();
+    return;
+  }
+  const key = `${place.lat},${place.lon}`;
+  const hit = cache.get(key);
+  if (hit && Date.now() - hit.at < 10 * 60_000) {
+    if (forecastStore.get() !== hit.data) forecastStore.set(hit.data);
+  }
+  if (activeSyncKey === key && inFlight.has(key)) return;
+  activeSyncKey = key;
+  loadForecast(place.lat, place.lon)
+    .then((data) => {
+      forecastStore.set(data);
+    })
+    .catch(() => {
+      if (forecastStore.get() === null) forecastStore.set("error");
+    });
+}
+
+// Reactively sync whenever location or settings change
+settings.subscribe(syncWeatherForecast);
+syncWeatherForecast();
+
+// Automatically refresh weather every 10 minutes
+if (typeof window !== "undefined") {
+  window.setInterval(() => {
+    const place = settings.get().weather;
+    if (place) {
+      cache.delete(`${place.lat},${place.lon}`);
+      syncWeatherForecast();
+    }
+  }, 10 * 60_000);
+}
+
 /** Forecast for the set location; null while loading or without a location, "error" on failure. */
 export function useForecast(): Forecast | null | "error" {
   const place = settings.use().weather;
-  const [data, setData] = useState<Forecast | null | "error">(null);
-  useEffect(() => {
-    if (!place) void detectPlace();
-  }, [place]);
-  useEffect(() => {
-    if (!place) return;
-    let alive = true;
-    loadForecast(place.lat, place.lon)
-      .then((d) => alive && setData(d))
-      .catch(() => alive && setData("error"));
-    return () => {
-      alive = false;
-    };
-  }, [place?.lat, place?.lon]);
-  return place ? data : null;
+  const forecast = forecastStore.use();
+  return place ? forecast : null;
 }
 
 // On start: first run or "automatic" → location from IP (a hand-picked one stays).

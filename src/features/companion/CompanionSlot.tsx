@@ -1,7 +1,8 @@
 import { useClipboard } from "../../platform/clipboard";
+import { drop } from "../../platform/drop";
 import { converterStore } from "../convert/ConvertView";
-import { useEffect, useState } from "react";
-import { AnimatePresence, motion, type Variants } from "motion/react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { AnimatePresence, motion, useAnimationFrame, useMotionValue, type Variants } from "motion/react";
 import {
   settings,
   type CompanionCustomization,
@@ -23,7 +24,7 @@ import {
 
 export type { CompanionMood, AudioClassification, DaydreamEmoji };
 export { classifyAudio };
-export type CompanionVariant = "peek" | "overview" | "music" | "clipboard" | "convert";
+export type CompanionVariant = "peek" | "overview" | "music" | "clipboard" | "convert" | "convert-empty";
 
 export interface NotchCompanionProps {
   status: NotchStatus;
@@ -151,7 +152,7 @@ export function getShapeColor(color: CompanionColor) {
           { offset: "100%", color: "#ffffff", opacity: 0.08 },
         ],
         auraBg:
-          "radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.32), transparent 72%)",
+          "radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0.42) 38%, rgba(255, 255, 255, 0.22) 65%, rgba(255, 255, 255, 0.05) 88%, transparent 100%)",
       };
     }
 
@@ -163,7 +164,7 @@ export function getShapeColor(color: CompanionColor) {
           { offset: "100%", color: "#000000", opacity: 0.82 },
         ],
         auraBg:
-          "radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.12), transparent 72%)",
+          "radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.24) 0%, rgba(255, 255, 255, 0.16) 38%, rgba(255, 255, 255, 0.08) 65%, transparent 100%)",
       };
     }
 
@@ -173,7 +174,7 @@ export function getShapeColor(color: CompanionColor) {
         { offset: "0%", color, opacity: 0.44 },
         { offset: "100%", color, opacity: 0.12 },
       ],
-      auraBg: `radial-gradient(circle at 50% 42%, color-mix(in srgb, ${color} 45%, transparent), transparent 72%)`,
+      auraBg: `radial-gradient(circle at 50% 50%, color-mix(in srgb, ${color} 75%, white 25%) 0%, color-mix(in srgb, ${color} 55%, transparent) 38%, color-mix(in srgb, ${color} 28%, transparent) 65%, color-mix(in srgb, ${color} 7%, transparent) 88%, transparent 100%)`,
     };
   }
 
@@ -186,7 +187,7 @@ export function getShapeColor(color: CompanionColor) {
           { offset: "100%", color: "var(--accent, #4285f4)", opacity: 0.1 },
         ],
         auraBg:
-          "radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--accent, #4285f4) 45%, transparent), transparent 72%)",
+          "radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--accent, #4285f4) 80%, white 20%) 0%, color-mix(in srgb, var(--accent, #4285f4) 55%, transparent) 38%, color-mix(in srgb, var(--accent, #4285f4) 28%, transparent) 65%, color-mix(in srgb, var(--accent, #4285f4) 7%, transparent) 88%, transparent 100%)",
       };
     case "gemini":
       return {
@@ -197,7 +198,7 @@ export function getShapeColor(color: CompanionColor) {
           { offset: "100%", color: "#2563eb", opacity: 0.12 },
         ],
         auraBg:
-          "radial-gradient(circle at 50% 42%, rgb(155 114 203 / 0.5), transparent 72%)",
+          "radial-gradient(circle at 50% 50%, rgb(192 132 252 / 0.70) 0%, rgb(155 114 203 / 0.50) 38%, rgb(66 133 244 / 0.25) 65%, rgb(37 99 235 / 0.06) 88%, transparent 100%)",
       };
     case "dark":
       return {
@@ -207,7 +208,7 @@ export function getShapeColor(color: CompanionColor) {
           { offset: "100%", color: "#000000", opacity: 0.8 },
         ],
         auraBg:
-          "radial-gradient(circle at 50% 42%, rgb(255 255 255 / 0.12), transparent 72%)",
+          "radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.24) 0%, rgba(255, 255, 255, 0.16) 38%, rgba(255, 255, 255, 0.08) 65%, transparent 100%)",
       };
     case "mint":
       return {
@@ -217,7 +218,7 @@ export function getShapeColor(color: CompanionColor) {
           { offset: "100%", color: "#34a853", opacity: 0.1 },
         ],
         auraBg:
-          "radial-gradient(circle at 50% 42%, rgb(52 168 83 / 0.42), transparent 72%)",
+          "radial-gradient(circle at 50% 50%, rgb(52 211 153 / 0.70) 0%, rgb(52 168 83 / 0.50) 38%, rgb(52 168 83 / 0.25) 65%, rgb(52 168 83 / 0.06) 88%, transparent 100%)",
       };
     case "amber":
       return {
@@ -227,7 +228,7 @@ export function getShapeColor(color: CompanionColor) {
           { offset: "100%", color: "#fbbc05", opacity: 0.1 },
         ],
         auraBg:
-          "radial-gradient(circle at 50% 42%, rgb(251 188 5 / 0.42), transparent 72%)",
+          "radial-gradient(circle at 50% 50%, rgb(251 191 36 / 0.75) 0%, rgb(251 188 5 / 0.52) 38%, rgb(251 188 5 / 0.26) 65%, rgb(251 188 5 / 0.06) 88%, transparent 100%)",
       };
     case "coral":
       return {
@@ -237,7 +238,7 @@ export function getShapeColor(color: CompanionColor) {
           { offset: "100%", color: "#ea4335", opacity: 0.1 },
         ],
         auraBg:
-          "radial-gradient(circle at 50% 42%, rgb(234 67 53 / 0.42), transparent 72%)",
+          "radial-gradient(circle at 50% 50%, rgb(248 113 113 / 0.72) 0%, rgb(234 67 53 / 0.50) 38%, rgb(234 67 53 / 0.25) 65%, rgb(234 67 53 / 0.06) 88%, transparent 100%)",
       };
     case "glass":
     default:
@@ -248,7 +249,7 @@ export function getShapeColor(color: CompanionColor) {
           { offset: "100%", color: "#ffffff", opacity: 0.06 },
         ],
         auraBg:
-          "radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--accent, #4285f4) 28%, transparent), transparent 72%)",
+          "radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--accent, #4285f4) 60%, white 30%) 0%, color-mix(in srgb, var(--accent, #4285f4) 40%, transparent) 38%, color-mix(in srgb, var(--accent, #4285f4) 20%, transparent) 65%, color-mix(in srgb, var(--accent, #4285f4) 5%, transparent) 88%, transparent 100%)",
       };
   }
 }
@@ -258,10 +259,13 @@ export function getShapeColor(color: CompanionColor) {
  */
 export function getColorStyle(color: CompanionColor) {
   if (color && (color.startsWith("#") || color.startsWith("rgb"))) {
+    const isLight = color.toLowerCase() === "#ffffff" || color.toLowerCase() === "#fff";
     return {
       bodyClass:
         "border-[2px] bg-gradient-to-b shadow-[inset_0_2px_8px_rgb(255_255_255/0.28)]",
-      auraBg: `radial-gradient(circle at 50% 42%, color-mix(in srgb, ${color} 45%, transparent), transparent 72%)`,
+      auraBg: isLight
+        ? "radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0.42) 38%, rgba(255, 255, 255, 0.22) 65%, rgba(255, 255, 255, 0.05) 88%, transparent 100%)"
+        : `radial-gradient(circle at 50% 50%, color-mix(in srgb, ${color} 75%, white 25%) 0%, color-mix(in srgb, ${color} 55%, transparent) 38%, color-mix(in srgb, ${color} 28%, transparent) 65%, color-mix(in srgb, ${color} 7%, transparent) 88%, transparent 100%)`,
     };
   }
 
@@ -271,42 +275,42 @@ export function getColorStyle(color: CompanionColor) {
         bodyClass:
           "border-[2px] border-[var(--accent,#4285f4)]/95 bg-gradient-to-b from-[var(--accent,#4285f4)]/[0.32] to-[var(--accent,#4285f4)]/[0.08] shadow-[inset_0_2px_8px_rgb(255_255_255/0.28),0_6px_20px_color-mix(in_srgb,var(--accent,#4285f4)_40%,transparent)]",
         auraBg:
-          "radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--accent, #4285f4) 45%, transparent), transparent 72%)",
+          "radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--accent, #4285f4) 80%, white 20%) 0%, color-mix(in srgb, var(--accent, #4285f4) 55%, transparent) 38%, color-mix(in srgb, var(--accent, #4285f4) 28%, transparent) 65%, color-mix(in srgb, var(--accent, #4285f4) 7%, transparent) 88%, transparent 100%)",
       };
     case "gemini":
       return {
         bodyClass:
           "border-[2px] border-[#c084fc]/90 bg-gradient-to-br from-[#9b72cb]/[0.35] via-[#4285f4]/[0.2] to-[#2563eb]/[0.1] shadow-[inset_0_2px_10px_rgb(255_255_255/0.3),0_6px_22px_rgb(155_114_203/0.45)]",
         auraBg:
-          "radial-gradient(circle at 50% 42%, rgb(155 114 203 / 0.5), transparent 72%)",
+          "radial-gradient(circle at 50% 50%, rgb(192 132 252 / 0.70) 0%, rgb(155 114 203 / 0.50) 38%, rgb(66 133 244 / 0.25) 65%, rgb(37 99 235 / 0.06) 88%, transparent 100%)",
       };
     case "dark":
       return {
         bodyClass:
           "border-[2px] border-white/35 bg-gradient-to-b from-white/[0.08] to-black/[0.7] shadow-[inset_0_2px_6px_rgb(255_255_255/0.1),0_6px_18px_rgb(0_0_0/0.8)]",
         auraBg:
-          "radial-gradient(circle at 50% 42%, rgb(255 255 255 / 0.12), transparent 72%)",
+          "radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.24) 0%, rgba(255, 255, 255, 0.16) 38%, rgba(255, 255, 255, 0.08) 65%, transparent 100%)",
       };
     case "mint":
       return {
         bodyClass:
           "border-[2px] border-[#34a853]/90 bg-gradient-to-b from-[#34a853]/[0.32] to-[#34a853]/[0.08] shadow-[inset_0_2px_8px_rgb(255_255_255/0.25),0_6px_18px_rgb(52_168_83/0.4)]",
         auraBg:
-          "radial-gradient(circle at 50% 42%, rgb(52 168 83 / 0.42), transparent 72%)",
+          "radial-gradient(circle at 50% 50%, rgb(52 211 153 / 0.70) 0%, rgb(52 168 83 / 0.50) 38%, rgb(52 168 83 / 0.25) 65%, rgb(52 168 83 / 0.06) 88%, transparent 100%)",
       };
     case "amber":
       return {
         bodyClass:
           "border-[2px] border-[#fbbc05]/90 bg-gradient-to-b from-[#fbbc05]/[0.32] to-[#fbbc05]/[0.08] shadow-[inset_0_2px_8px_rgb(255_255_255/0.25),0_6px_18px_rgb(251_188_5/0.4)]",
         auraBg:
-          "radial-gradient(circle at 50% 42%, rgb(251 188 5 / 0.42), transparent 72%)",
+          "radial-gradient(circle at 50% 50%, rgb(251 191 36 / 0.75) 0%, rgb(251 188 5 / 0.52) 38%, rgb(251 188 5 / 0.26) 65%, rgb(251 188 5 / 0.06) 88%, transparent 100%)",
       };
     case "coral":
       return {
         bodyClass:
           "border-[2px] border-[#ea4335]/90 bg-gradient-to-b from-[#ea4335]/[0.32] to-[#ea4335]/[0.08] shadow-[inset_0_2px_8px_rgb(255_255_255/0.25),0_6px_18px_rgb(234_67_53/0.4)]",
         auraBg:
-          "radial-gradient(circle at 50% 42%, rgb(234 67 53 / 0.42), transparent 72%)",
+          "radial-gradient(circle at 50% 50%, rgb(248 113 113 / 0.72) 0%, rgb(234 67 53 / 0.50) 38%, rgb(234 67 53 / 0.25) 65%, rgb(234 67 53 / 0.06) 88%, transparent 100%)",
       };
     case "glass":
     default:
@@ -314,7 +318,7 @@ export function getColorStyle(color: CompanionColor) {
         bodyClass:
           "border-[2px] border-white/90 bg-gradient-to-b from-white/[0.16] to-white/[0.05] shadow-[inset_0_2px_8px_rgb(255_255_255/0.22),0_6px_18px_rgb(0_0_0/0.45)]",
         auraBg:
-          "radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--accent, #4285f4) 28%, transparent), transparent 72%)",
+          "radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--accent, #4285f4) 60%, white 30%) 0%, color-mix(in srgb, var(--accent, #4285f4) 40%, transparent) 38%, color-mix(in srgb, var(--accent, #4285f4) 20%, transparent) 65%, color-mix(in srgb, var(--accent, #4285f4) 5%, transparent) 88%, transparent 100%)",
       };
   }
 }
@@ -422,27 +426,97 @@ export function DaydreamBubble({ emoji }: { emoji: DaydreamEmoji }) {
  * - Decouples continuous infinite loops from component re-renders (no jitter on mouse look)
  * - Guarantees smooth spring-damped return to `rotate: 0` whenever an animation ends
  */
+export function ActionParticles({ mood }: { mood: CompanionMood }) {
+  if (mood === "smelting") {
+    return (
+      <div className="pointer-events-none absolute inset-0 z-20 overflow-visible select-none">
+        <motion.div
+          className="absolute -top-3 left-1 text-[13px] font-bold text-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.8)]"
+          initial={{ opacity: 0, y: 4, scale: 0.5 }}
+          animate={{ opacity: [0, 1, 0], y: [-2, -26], x: [-2, -10], scale: [0.5, 1.15, 0.7], rotate: [0, -25] }}
+          transition={{ duration: 0.65, repeat: Infinity, ease: "easeOut" }}
+        >
+          ⚡
+        </motion.div>
+        <motion.div
+          className="absolute -top-4 right-1 text-[13px] font-bold text-orange-300 drop-shadow-[0_0_6px_rgba(253,186,116,0.8)]"
+          initial={{ opacity: 0, y: 4, scale: 0.5 }}
+          animate={{ opacity: [0, 1, 0], y: [-2, -28], x: [2, 10], scale: [0.5, 1.2, 0.7], rotate: [0, 25] }}
+          transition={{ duration: 0.65, repeat: Infinity, ease: "easeOut", delay: 0.28 }}
+        >
+          ✦
+        </motion.div>
+      </div>
+    );
+  }
+  if (mood === "stamp") {
+    return (
+      <div className="pointer-events-none absolute inset-0 z-20 overflow-visible select-none">
+        <motion.div
+          className="absolute -top-3 right-0 text-[13px] font-bold text-amber-300 drop-shadow-[0_2px_6px_rgba(251,191,36,0.65)]"
+          initial={{ opacity: 0, y: 4, scale: 0.4 }}
+          animate={{ opacity: [0, 1, 0], y: [-2, -22], x: [2, 8], scale: [0.4, 1.2, 0.8] }}
+          transition={{ duration: 0.75, ease: "easeOut" }}
+        >
+          ✦
+        </motion.div>
+        <motion.div
+          className="absolute -top-2 left-0 text-[11px] font-bold text-emerald-400 drop-shadow-[0_2px_6px_rgba(52,211,153,0.65)]"
+          initial={{ opacity: 0, y: 4, scale: 0.4 }}
+          animate={{ opacity: [0, 1, 0], y: [-2, -18], x: [-2, -7], scale: [0.4, 1.1, 0.8] }}
+          transition={{ duration: 0.75, ease: "easeOut", delay: 0.08 }}
+        >
+          ✓
+        </motion.div>
+      </div>
+    );
+  }
+  return null;
+}
+
 export const COMPANION_MOTION_VARIANTS: Variants = {
   smelting: {
-    y: [0, -2, 1, -1.5, 0],
-    rotate: [-3.5, 3.5, -3.5, 3.5, 0],
-    scale: [1, 1.05, 0.98, 1.03, 1],
-    x: [0, -1.5, 1.5, -1, 1, 0],
+    y: [0, -2.5, 1.5, -2, 1, 0],
+    rotate: [-5, 5, -4, 4, 0],
+    scale: [1, 1.07, 0.94, 1.04, 1],
+    x: [0, -2, 2, -1.5, 1.5, 0],
     transition: {
       repeat: Infinity,
-      duration: 0.32,
+      duration: 0.28,
       ease: "easeInOut",
     },
   },
   hungry: {
-    y: [0, -2, 0],
+    y: [0, -4, 0],
     rotate: 0,
-    scale: 1.04,
+    scale: [1, 1.07, 1],
     x: 0,
     transition: {
       repeat: Infinity,
-      duration: 2.0,
+      duration: 0.55,
       ease: "easeInOut",
+    },
+  },
+  stamp: {
+    y: [0, -7, 2.5, 0],
+    scale: [1, 1.1, 0.93, 1],
+    rotate: [0, -5, 6, 0],
+    x: 0,
+    transition: {
+      duration: 0.52,
+      ease: "easeOut",
+      rotate: { type: "spring", stiffness: 260, damping: 18 },
+    },
+  },
+  "butler-bow": {
+    y: [0, 5, 5, 0],
+    scale: [1, 0.92, 0.92, 1],
+    rotate: [0, -8, -8, 0],
+    x: 0,
+    transition: {
+      duration: 0.95,
+      ease: "easeInOut",
+      rotate: { type: "spring", stiffness: 220, damping: 20 },
     },
   },
 
@@ -636,6 +710,241 @@ export const COMPANION_MOTION_VARIANTS: Variants = {
 };
 
 /**
+ * Universal Declarative Companion Rig:
+ * Every present or future mood/state simply declares its resting posture and wave
+ * parameters here (plus an optional one-shot impulse curve).
+ * `useSmoothCompanionRig` exponentially lerps all posture & wave parameters on a
+ * single continuous phase, so switching between ANY two states never snaps or resets!
+ */
+export interface CompanionRigProfile {
+  y?: number;
+  x?: number;
+  scale?: number;
+  rotate?: number;
+  ampY?: number;
+  ampX?: number;
+  ampScale?: number;
+  ampRotate?: number;
+  freq?: number;
+  impulse?: {
+    durationMs: number;
+    sample: (t01: number) => { y?: number; x?: number; scale?: number; rotate?: number };
+  };
+}
+
+export const COMPANION_RIG_PROFILES: Record<CompanionMood | "peek", CompanionRigProfile> = {
+  happy: { y: -1.1, ampY: 1.1, scale: 1, freq: 0.31 },
+  peek: { y: 0, ampY: 0.8, scale: 1, freq: 0.31 },
+  curious: { y: -0.9, ampY: 0.9, scale: 1.02, freq: 0.36 },
+  "vibing-chill": { y: -0.9, ampY: 0.9, ampRotate: 4.5, scale: 1, freq: 0.36 },
+  "vibing-hard": { y: -1.8, ampY: 1.8, ampRotate: 3.5, ampScale: 0.02, scale: 1, freq: 1.18 },
+  "vibing-super": { y: -2.2, ampY: 2.8, ampRotate: 5.5, ampScale: 0.04, scale: 1.02, freq: 2.15 },
+  vibing: { y: -1.2, ampY: 1.2, ampRotate: 4.0, scale: 1, freq: 0.5 },
+  studying: { y: -0.7, ampY: 0.7, scale: 1, freq: 0.42 },
+  listening: { y: -0.6, ampY: 0.6, rotate: -1.5, scale: 1, freq: 0.3 },
+  petting: { y: -0.7, ampY: 0.7, scale: 1.025, ampScale: 0.025, freq: 0.62 },
+  tickled: { y: -1.2, ampY: 1.3, ampRotate: 4.5, scale: 1, freq: 2.85 },
+  angry: { y: 0, ampX: 3.8, scale: 1.06, freq: 2.5 },
+  sad: { y: 2, ampY: 0.4, scale: 0.96, freq: 0.25 },
+  sleepy: { y: 0.8, ampY: 0.8, scale: 0.985, ampScale: 0.015, freq: 0.24 },
+  hungry: { y: -2, ampY: 2.2, scale: 1.035, ampScale: 0.035, freq: 1.8 },
+  smelting: { y: -0.5, ampY: 2.2, ampX: 2.0, ampRotate: 5.0, ampScale: 0.055, scale: 1.01, freq: 3.6 },
+  winking: {
+    y: -0.8,
+    ampY: 0.8,
+    scale: 1,
+    freq: 0.31,
+    impulse: {
+      durationMs: 420,
+      sample: (t) => ({
+        scale: Math.sin(t * Math.PI) * 0.11,
+        rotate: Math.sin(t * Math.PI * 2) * -6,
+      }),
+    },
+  },
+  yawn: {
+    y: -0.8,
+    ampY: 0.8,
+    scale: 1,
+    freq: 0.31,
+    impulse: {
+      durationMs: 1900,
+      sample: (t) => {
+        const env = Math.sin(t * Math.PI);
+        return { y: env * -3.5, scale: env * 0.09 };
+      },
+    },
+  },
+  sneeze: {
+    y: -0.8,
+    ampY: 0.8,
+    scale: 1,
+    freq: 0.31,
+    impulse: {
+      durationMs: 650,
+      sample: (t) => {
+        if (t < 0.38) {
+          const p = Math.sin((t / 0.38) * (Math.PI / 2));
+          return { y: p * 2.2, scale: p * -0.07 };
+        }
+        const p = Math.sin(((t - 0.38) / 0.62) * Math.PI);
+        return { y: p * -4.8, scale: p * 0.08 };
+      },
+    },
+  },
+  stamp: {
+    y: -0.9,
+    ampY: 0.9,
+    scale: 1,
+    freq: 0.35,
+    impulse: {
+      durationMs: 560,
+      sample: (t) => ({
+        y: Math.sin(t * Math.PI * 1.5) * -6.5 * (1 - t * 0.4),
+        scale: Math.sin(t * Math.PI * 1.5) * 0.09 * (1 - t * 0.3),
+        rotate: Math.sin(t * Math.PI * 2) * -5.5 * (1 - t * 0.3),
+      }),
+    },
+  },
+  "butler-bow": {
+    y: -0.8,
+    ampY: 0.8,
+    scale: 1,
+    freq: 0.31,
+    impulse: {
+      durationMs: 950,
+      sample: (t) => {
+        const env = Math.sin(t * Math.PI);
+        return {
+          y: env * 4.8,
+          scale: env * -0.075,
+          rotate: env * -8,
+        };
+      },
+    },
+  },
+};
+
+export function useSmoothCompanionRig(activeState: CompanionMood | "peek") {
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+  const scale = useMotionValue(1);
+  const rotate = useMotionValue(0);
+
+  const stateRef = useRef({
+    active: activeState,
+    phase: 0,
+    impulseStart: performance.now(),
+    baseY: 0,
+    baseX: 0,
+    baseScale: 1,
+    baseRotate: 0,
+    ampY: 1,
+    ampX: 0,
+    ampScale: 0,
+    ampRotate: 0,
+    freq: 0.31,
+    outX: 0,
+    outY: 0,
+    outScale: 1,
+    outRotate: 0,
+  });
+
+  if (stateRef.current.active !== activeState) {
+    stateRef.current.active = activeState;
+    stateRef.current.impulseStart = performance.now();
+  }
+
+  useAnimationFrame((now, delta) => {
+    const s = stateRef.current;
+    const dt = Math.min(Math.max(delta / 1000, 0.001), 0.05);
+    const profile = COMPANION_RIG_PROFILES[s.active] ?? COMPANION_RIG_PROFILES.happy;
+
+    // Smooth exponential interpolation of rig parameters (~110ms time constant)
+    const paramAlpha = 1 - Math.exp(-9 * dt);
+    s.baseY += ((profile.y ?? 0) - s.baseY) * paramAlpha;
+    s.baseX += ((profile.x ?? 0) - s.baseX) * paramAlpha;
+    s.baseScale += ((profile.scale ?? 1) - s.baseScale) * paramAlpha;
+    s.baseRotate += ((profile.rotate ?? 0) - s.baseRotate) * paramAlpha;
+    s.ampY += ((profile.ampY ?? 0) - s.ampY) * paramAlpha;
+    s.ampX += ((profile.ampX ?? 0) - s.ampX) * paramAlpha;
+    s.ampScale += ((profile.ampScale ?? 0) - s.ampScale) * paramAlpha;
+    s.ampRotate += ((profile.ampRotate ?? 0) - s.ampRotate) * paramAlpha;
+    s.freq += ((profile.freq ?? 0.31) - s.freq) * paramAlpha;
+
+    // Advance continuous phase without ever resetting
+    s.phase = (s.phase + dt * s.freq * Math.PI * 2) % (Math.PI * 200);
+
+    // Optional one-shot gesture impulse
+    let impX = 0;
+    let impY = 0;
+    let impScale = 0;
+    let impRotate = 0;
+    if (profile.impulse) {
+      const elapsed = now - s.impulseStart;
+      if (elapsed >= 0 && elapsed < profile.impulse.durationMs) {
+        const sample = profile.impulse.sample(elapsed / profile.impulse.durationMs);
+        impX = sample.x ?? 0;
+        impY = sample.y ?? 0;
+        impScale = sample.scale ?? 0;
+        impRotate = sample.rotate ?? 0;
+      }
+    }
+
+    const waveSin = Math.sin(s.phase);
+    const waveCos = Math.cos(s.phase);
+
+    const desiredX = s.baseX + waveSin * s.ampX + impX;
+    const desiredY = s.baseY + waveSin * s.ampY + impY;
+    const desiredScale = s.baseScale + waveSin * s.ampScale + impScale;
+    const desiredRotate = s.baseRotate + waveCos * s.ampRotate + impRotate;
+
+    // Final output damper guarantees C1 smoothness even if an impulse is interrupted mid-air
+    const outAlpha = 1 - Math.exp(-16 * dt);
+    s.outX += (desiredX - s.outX) * outAlpha;
+    s.outY += (desiredY - s.outY) * outAlpha;
+    s.outScale += (desiredScale - s.outScale) * outAlpha;
+    s.outRotate += (desiredRotate - s.outRotate) * outAlpha;
+
+    x.set(s.outX);
+    y.set(s.outY);
+    scale.set(s.outScale);
+    rotate.set(s.outRotate);
+  });
+
+  return { x, y, scale, rotate };
+}
+
+/**
+ * Reusable smooth transition wrapper for companion overlays, accessories, and particles.
+ * Guarantees that any accessory or particle layer fades & springs in/out instead of snapping.
+ */
+function SmoothOverlayPresence({
+  activeKey,
+  children,
+}: {
+  activeKey: string;
+  children: ReactNode;
+}) {
+  return (
+    <AnimatePresence initial={false}>
+      {activeKey !== "none" && children && (
+        <motion.div
+          key={activeKey}
+          className="pointer-events-none absolute inset-0 size-full overflow-visible"
+          initial={{ opacity: 0, scale: 0.88, y: 2 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.88, y: 2 }}
+          transition={{ type: "spring", visualDuration: 0.24, bounce: 0.12 }}
+        >
+          {children}
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+/**
  * Persistent living Companion:
  * Always alive, continuous, and single-instance across all states.
  * - Stage 2 (`peek`): Peeking out curiously at the center of the compact island (size 32px)
@@ -657,8 +966,12 @@ export function NotchCompanion({ status, activeTab, size, geometry, line }: Notc
 
   const clipItems = useClipboard();
   const hasClips = clipItems.length > 0;
-  const { filesCount } = converterStore.use();
+  const { mode: converterMode, filesCount, isConverting } = converterStore.use();
   const hasFiles = filesCount > 0;
+  const isDraggingFiles = drop.use().dragging;
+
+  const isConvertEmptyDropzone = isConvert && converterMode === "files" && !hasFiles;
+  const isSideSlot = (isClipboard && hasClips) || (isConvert && !isConvertEmptyDropzone);
 
   // Derive variant for layout sizing and positioning
   const variant: CompanionVariant = isMusic
@@ -667,24 +980,35 @@ export function NotchCompanion({ status, activeTab, size, geometry, line }: Notc
       ? "peek"
       : isClipboard
         ? "clipboard"
-        : isConvert
-          ? "convert"
-          : "overview";
+        : isConvertEmptyDropzone
+          ? "convert-empty"
+          : isConvert
+            ? "convert"
+            : "overview";
 
   // Dimensions
   const musicSize = Math.round(companionSize * 0.88);
-  const sideSize = Math.round(companionSize * 0.72);
+  const sideSize = Math.round(companionSize * 0.76);
   const targetSize = isPeek
     ? 32
     : isMusic
       ? musicSize
-      : (isClipboard && hasClips) || (isConvert && hasFiles)
+      : isSideSlot
         ? sideSize
         : companionSize;
 
   // Vertical center inside content area (between Header 32px and Dock 46px)
+  // Note: For Clipboard with items, lock Y to the 146px card row (109px) so expanding
+  // an image preview below never pulls the companion down over the preview!
+  // For empty Converter dropzone, offset Y by -26px to match CompanionSlot above the drop prompt.
   const contentCenterY = (size.h - 14) / 2;
-  const targetCenterY = isPeek ? geometry.h / 2 : contentCenterY;
+  const targetCenterY = isPeek
+    ? geometry.h / 2
+    : isClipboard && hasClips
+      ? (232 - 14) / 2
+      : isConvertEmptyDropzone
+        ? contentCenterY - 26
+        : contentCenterY;
 
   // Horizontal center offset (0 = center of notch):
   const musicCenterX = -size.w / 2 + 24 + musicSize / 2;
@@ -694,7 +1018,7 @@ export function NotchCompanion({ status, activeTab, size, geometry, line }: Notc
     ? musicCenterX
     : isPeek
       ? peekCenterX
-      : (isClipboard && hasClips) || (isConvert && hasFiles)
+      : isSideSlot
         ? sideCenterX
         : 0;
 
@@ -712,10 +1036,10 @@ export function NotchCompanion({ status, activeTab, size, geometry, line }: Notc
     ? window.innerWidth / 2 + musicCenterX
     : isPeek
       ? window.innerWidth / 2 + peekCenterX
-      : (isClipboard && hasClips) || (isConvert && hasFiles)
+      : isSideSlot
         ? window.innerWidth / 2 + sideCenterX
         : window.innerWidth / 2;
-  const cy = isPeek ? geometry.h / 2 : contentCenterY;
+  const cy = targetCenterY;
 
   // Autonomous Tamagotchi Brain
   const brain = useCompanionBrain({
@@ -723,6 +1047,15 @@ export function NotchCompanion({ status, activeTab, size, geometry, line }: Notc
     isMusicTab: isMusic,
     ambientCenter: { x: cx, y: cy },
   });
+
+  const effectiveMood: CompanionMood =
+    isConvert && isConverting
+      ? "smelting"
+      : isConvert && isDraggingFiles
+        ? "hungry"
+        : brain.mood;
+
+  const canInteract = (isOverview || isClipboard || isConvert) && !brain.audioInfo.isMusic;
 
   const eyeOffset = variant === "peek" ? 2.2 : 3.8;
   const pupilX = brain.look.x * eyeOffset;
@@ -737,6 +1070,11 @@ export function NotchCompanion({ status, activeTab, size, geometry, line }: Notc
 
   const colorStyle = getColorStyle(comp.color);
   const shapeRadius = getShapeRadius(comp.shape);
+  const rigState = variant === "peek" && effectiveMood === "happy" ? "peek" : effectiveMood;
+  const rig = useSmoothCompanionRig(rigState);
+  const headSlotKey = showHeadphones ? `headphones-${comp.shape}` : activeHat;
+  const particleKey =
+    effectiveMood === "smelting" || effectiveMood === "stamp" ? effectiveMood : "none";
 
   return (
     <motion.div
@@ -758,38 +1096,48 @@ export function NotchCompanion({ status, activeTab, size, geometry, line }: Notc
         bounce: Math.max(0.16, openBounce),
       }}
     >
-      {/* Soft ambient aura behind the companion */}
-      {comp.aura && (
-        <motion.div
-          className="pointer-events-none absolute inset-0 rounded-full"
-          style={{ background: colorStyle.auraBg }}
-          animate={{
-            scale:
-              brain.audioInfo.isAudioActive && (variant === "music" || showHeadphones)
-                ? brain.audioInfo.grooveLevel === 3
-                  ? [1, 1.25, 1]
-                  : brain.audioInfo.grooveLevel === 2
-                    ? [1, 1.18, 1]
-                    : [1, 1.1, 1]
-                : [1, 1.05, 1],
-          }}
-          transition={{
-            duration:
-              brain.audioInfo.isAudioActive && (variant === "music" || showHeadphones)
-                ? brain.audioInfo.grooveLevel === 3
-                  ? 0.46
-                  : brain.audioInfo.grooveLevel === 2
-                    ? 0.85
-                    : 2.8
-                : 2.8,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
-        />
-      )}
-
-      {/* Floating thought bubble (kept in brain, visually hidden for now) */}
-
+      {/* Soft ambient bloom behind the companion */}
+      <AnimatePresence initial={false}>
+        {comp.aura && (
+          <motion.div
+            key="companion-aura"
+            className={`pointer-events-none absolute rounded-full ${
+              variant === "peek"
+                ? "-inset-3 blur-md opacity-75"
+                : "-inset-8 blur-xl opacity-90"
+            }`}
+            style={{ background: colorStyle.auraBg }}
+            initial={{ opacity: 0, scale: 0.85 }}
+            animate={{
+              opacity: variant === "peek" ? 0.75 : 0.9,
+              scale:
+                brain.audioInfo.isAudioActive && (variant === "music" || showHeadphones)
+                  ? brain.audioInfo.grooveLevel === 3
+                    ? [1, 1.25, 1]
+                    : brain.audioInfo.grooveLevel === 2
+                      ? [1, 1.18, 1]
+                      : [1, 1.1, 1]
+                  : [1, 1.05, 1],
+            }}
+            exit={{ opacity: 0, scale: 0.85 }}
+            transition={{
+              opacity: { duration: 0.25 },
+              scale: {
+                duration:
+                  brain.audioInfo.isAudioActive && (variant === "music" || showHeadphones)
+                    ? brain.audioInfo.grooveLevel === 3
+                      ? 0.46
+                      : brain.audioInfo.grooveLevel === 2
+                        ? 0.85
+                        : 2.8
+                    : 2.8,
+                repeat: Infinity,
+                ease: "easeInOut",
+              },
+            }}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Floating music notes during music playback / vibing */}
       <AnimatePresence>
@@ -802,47 +1150,65 @@ export function NotchCompanion({ status, activeTab, size, geometry, line }: Notc
         )}
       </AnimatePresence>
 
+      {/* Action particles for Converter smelting & Clipboard stamp */}
+      <SmoothOverlayPresence activeKey={particleKey}>
+        <ActionParticles mood={effectiveMood} />
+      </SmoothOverlayPresence>
+
       <motion.div
         className={`relative flex size-full items-center justify-center ${
-          isOverview && !brain.audioInfo.isMusic ? "pointer-events-auto cursor-pointer" : ""
+          canInteract ? "pointer-events-auto cursor-pointer" : ""
         }`}
-        style={{ borderRadius: shapeRadius }}
+        style={{
+          borderRadius: shapeRadius,
+          x: rig.x,
+          y: rig.y,
+          scale: rig.scale,
+          rotate: rig.rotate,
+        }}
         onPointerMove={
-          isOverview && !brain.audioInfo.isMusic
+          canInteract
             ? (e) => brain.onPointerMove(e, e.currentTarget.getBoundingClientRect())
             : undefined
         }
-        onPointerLeave={isOverview && !brain.audioInfo.isMusic ? brain.onPointerLeave : undefined}
-        onClick={isOverview && !brain.audioInfo.isMusic ? brain.onClick : undefined}
-        variants={COMPANION_MOTION_VARIANTS}
-        animate={variant === "peek" && brain.mood === "happy" ? "peek" : brain.mood}
+        onPointerLeave={canInteract ? brain.onPointerLeave : undefined}
+        onClick={canInteract ? brain.onClick : undefined}
       >
         {/* Vector shape body with gradient, stroke, and gloss */}
         <CompanionBody shape={comp.shape} color={comp.color} />
 
-        {/* Adaptive Headphones (adapts logically to every shape + pulses in Level 2 & Level 3) */}
-        {showHeadphones && (
-          <HeadphonesOverlay
-            shape={comp.shape}
-            grooveLevel={brain.audioInfo.grooveLevel}
-          />
-        )}
+        {/* Head slot (Headphones or Hat) with automatic spring enter/exit */}
+        <SmoothOverlayPresence activeKey={headSlotKey}>
+          {showHeadphones ? (
+            <HeadphonesOverlay
+              shape={comp.shape}
+              grooveLevel={brain.audioInfo.grooveLevel}
+            />
+          ) : activeHat === "beanie" ? (
+            <BeanieOverlay />
+          ) : activeHat === "halo" ? (
+            <HaloOverlay />
+          ) : activeHat === "crown" ? (
+            <CrownOverlay />
+          ) : activeHat === "cap" ? (
+            <CapOverlay />
+          ) : null}
+        </SmoothOverlayPresence>
 
-        {/* Hats slot: hidden during music when smart accessories equips headphones */}
-        {!showHeadphones && activeHat === "beanie" && <BeanieOverlay />}
-        {!showHeadphones && activeHat === "halo" && <HaloOverlay />}
-        {!showHeadphones && activeHat === "crown" && <CrownOverlay />}
-        {!showHeadphones && activeHat === "cap" && <CapOverlay />}
-
-        {/* Eyewear slot: can be worn alongside hats or headphones */}
-        {activeEyewear === "glasses" && <GlassesOverlay />}
-        {activeEyewear === "shades" && <ShadesOverlay />}
+        {/* Eyewear slot with automatic spring enter/exit */}
+        <SmoothOverlayPresence activeKey={activeEyewear}>
+          {activeEyewear === "glasses" ? (
+            <GlassesOverlay />
+          ) : activeEyewear === "shades" ? (
+            <ShadesOverlay />
+          ) : null}
+        </SmoothOverlayPresence>
 
         {/* Autonomous Face SVG: reacts to music, cursor, sleepiness, daydreams, and clicks */}
         <FaceOverlay
           variant={variant}
           shape={comp.shape}
-          mood={brain.mood}
+          mood={effectiveMood}
           pupilX={pupilX}
           pupilY={pupilY}
           blink={brain.blink}
@@ -942,8 +1308,10 @@ export function CompanionBody({
       </defs>
 
       {/* Main vector body with gradient and soft drop shadow */}
-      <path
+      <motion.path
         d={d}
+        animate={{ d, stroke: colorSpec.strokeColor }}
+        transition={{ type: "spring", visualDuration: 0.32, bounce: 0.12 }}
         fill={`url(#comp-grad-${safeId})`}
         stroke={colorSpec.strokeColor}
         strokeWidth="2.5"
@@ -952,8 +1320,10 @@ export function CompanionBody({
       />
 
       {/* Glossy top specular highlight */}
-      <path
+      <motion.path
         d={d}
+        animate={{ d }}
+        transition={{ type: "spring", visualDuration: 0.32, bounce: 0.12 }}
         fill="url(#comp-specular-shine)"
         opacity="0.65"
       />
@@ -1519,19 +1889,49 @@ export function FaceOverlay({
     mood !== "tickled" &&
     mood !== "sneeze" &&
     mood !== "studying" &&
+    mood !== "smelting" &&
+    mood !== "stamp" &&
+    mood !== "butler-bow" &&
     mood !== "vibing-chill" &&
     mood !== "vibing-hard" &&
     mood !== "vibing-super";
 
+  const faceKey = isBlinking
+    ? "blink"
+    : variant === "convert-empty" && mood === "happy"
+      ? "convert-empty"
+      : mood === "curious" || variant === "peek"
+        ? "curious"
+        : mood;
+
   return (
     <svg viewBox="0 0 100 100" className="size-full overflow-visible" aria-label="Companion Face">
-      <g
-        style={{
-          transform: `translate(${pupilX}px, ${pupilY + offsetY}px) scale(${scale})`,
-          transformOrigin: "50% 54%",
-          transition: "transform 90ms ease-out",
-        }}
+      <motion.g
+        style={{ transformOrigin: "50% 54%" }}
+        animate={{ x: pupilX, y: pupilY + offsetY, scale }}
+        transition={{ type: "spring", stiffness: 260, damping: 24, mass: 0.6 }}
       >
+        <AnimatePresence mode="popLayout" initial={false}>
+          <motion.g
+            key={faceKey}
+            style={{ transformOrigin: "50% 50%" }}
+            initial={
+              isBlinking
+                ? { opacity: 0.6, scaleY: 0.25 }
+                : { opacity: 0, scale: 0.86, y: 1.5 }
+            }
+            animate={{ opacity: 1, scale: 1, scaleY: 1, y: 0 }}
+            exit={
+              isBlinking
+                ? { opacity: 0, scaleY: 0.35 }
+                : { opacity: 0, scale: 0.86, y: -1.5 }
+            }
+            transition={{
+              type: "spring",
+              visualDuration: isBlinking ? 0.08 : 0.22,
+              bounce: isBlinking ? 0 : 0.12,
+            }}
+          >
         {isBlinking ? (
           /* Smooth natural blink arches */
           <>
@@ -1596,19 +1996,42 @@ export function FaceOverlay({
             <circle cx="27" cy="45" r="3.4" fill="#ff7698" opacity="0.5" />
             <circle cx="73" cy="45" r="3.4" fill="#ff7698" opacity="0.5" />
           </>
-                ) : mood === "smelting" ? (
-          /* Dizzy spinning blender eyes '@ @' and open teeth/grin */
+        ) : mood === "smelting" ? (
+          /* Dizzy spinning blender eyes '@ @' and zigzag high-voltage mouth */
           <>
             <path d="M 28 38 C 34 34, 40 40, 36 44 C 32 48, 28 42, 33 39" fill="none" stroke="white" strokeWidth="3.6" strokeLinecap="round" />
             <path d="M 58 38 C 64 34, 70 40, 66 44 C 62 48, 58 42, 63 39" fill="none" stroke="white" strokeWidth="3.6" strokeLinecap="round" />
-            <ellipse cx="50" cy="62" rx="7" ry="5" fill="white" />
+            <path d="M 38 61 L 44 57 L 50 63 L 56 57 L 62 61" fill="none" stroke="white" strokeWidth="3.8" strokeLinecap="round" strokeLinejoin="round" />
           </>
         ) : mood === "hungry" ? (
-          /* Wide open hungry mouth 'O' waiting to swallow files with bright eyes */
+          /* Wide open hungry mouth 'O' waiting to swallow files with bright starry eyes */
           <>
-            <circle cx="34" cy="40" r="5.8" fill="white" />
-            <circle cx="66" cy="40" r="5.8" fill="white" />
-            <circle cx="50" cy="62" r="7.5" fill="white" />
+            <circle cx="34" cy="40" r="6" fill="white" />
+            <circle cx="66" cy="40" r="6" fill="white" />
+            <ellipse cx="50" cy="61" rx="8.5" ry="9.5" fill="white" />
+          </>
+        ) : mood === "stamp" ? (
+          /* Collector stamp approval: cheerful wink + wide happy 'D' grin + rosy cheeks */
+          <>
+            <path d="M 26 43 Q 35 32 44 43" fill="none" stroke="white" strokeWidth="4.8" strokeLinecap="round" />
+            <path d="M 57 42 L 72 42" stroke="white" strokeWidth="4.8" strokeLinecap="round" />
+            <path d="M 41 56 Q 50 70 59 56 Z" fill="white" />
+            <circle cx="27" cy="51" r="4.5" fill="#34d399" opacity="0.65" />
+            <circle cx="73" cy="51" r="4.5" fill="#34d399" opacity="0.65" />
+          </>
+        ) : mood === "butler-bow" ? (
+          /* Polite office butler bow: respectful closed downward arches and gentle smile */
+          <>
+            <path d="M 27 42 Q 35 48 43 42" fill="none" stroke="white" strokeWidth="4.5" strokeLinecap="round" />
+            <path d="M 57 42 Q 65 48 73 42" fill="none" stroke="white" strokeWidth="4.5" strokeLinecap="round" />
+            <path d="M 44 59 Q 50 64 56 59" fill="none" stroke="white" strokeWidth="3.8" strokeLinecap="round" />
+          </>
+        ) : variant === "convert-empty" && mood === "happy" ? (
+          /* Expectant blender waiting for files in empty dropzone: bright eyes & open mouth */
+          <>
+            <circle cx="35" cy="42" r="5.4" fill="white" />
+            <circle cx="65" cy="42" r="5.4" fill="white" />
+            <ellipse cx="50" cy="60" rx="5.2" ry="6" fill="white" />
           </>
         ) : mood === "vibing-chill" ? (
           /* Level 1 Chill Vibe: Serene closed arches and relaxed content smile */
@@ -1695,7 +2118,9 @@ export function FaceOverlay({
             <path d="M 44 60 Q 50 65 56 60" fill="none" stroke="white" strokeWidth="4.2" strokeLinecap="round" />
           </>
         )}
-      </g>
+          </motion.g>
+        </AnimatePresence>
+      </motion.g>
     </svg>
   );
 }
@@ -1828,6 +2253,8 @@ export function CompanionStage({
   const colorStyle = getColorStyle(comp.color);
   const shapeRadius = getShapeRadius(comp.shape);
   const displaySize = Math.max(68, Math.min(84, companionSize));
+  const rig = useSmoothCompanionRig(brain.mood);
+  const headSlotKey = showHeadphones ? `headphones-${comp.shape}` : activeHat;
 
   // Dynamic status hint reflecting BMO's inner state
   const hintText =
@@ -1917,10 +2344,15 @@ export function CompanionStage({
         </AnimatePresence>
 
         <motion.div
-          style={{ width: displaySize, height: displaySize }}
+          style={{
+            width: displaySize,
+            height: displaySize,
+            x: rig.x,
+            y: rig.y,
+            scale: rig.scale,
+            rotate: rig.rotate,
+          }}
           className="relative flex items-center justify-center"
-          variants={COMPANION_MOTION_VARIANTS}
-          animate={brain.mood}
         >
           <div
             className="relative flex size-full items-center justify-center"
@@ -1929,23 +2361,32 @@ export function CompanionStage({
             {/* Vector shape body with gradient, stroke, and gloss */}
             <CompanionBody shape={comp.shape} color={comp.color} />
 
-            {/* Adaptive Headphones */}
-            {showHeadphones && (
-              <HeadphonesOverlay
-                shape={comp.shape}
-                grooveLevel={brain.audioInfo.grooveLevel}
-              />
-            )}
-
-            {/* Hats Slot */}
-            {!showHeadphones && activeHat === "beanie" && <BeanieOverlay />}
-            {!showHeadphones && activeHat === "halo" && <HaloOverlay />}
-            {!showHeadphones && activeHat === "crown" && <CrownOverlay />}
-            {!showHeadphones && activeHat === "cap" && <CapOverlay />}
+            {/* Head Slot (Headphones or Hat) */}
+            <SmoothOverlayPresence activeKey={headSlotKey}>
+              {showHeadphones ? (
+                <HeadphonesOverlay
+                  shape={comp.shape}
+                  grooveLevel={brain.audioInfo.grooveLevel}
+                />
+              ) : activeHat === "beanie" ? (
+                <BeanieOverlay />
+              ) : activeHat === "halo" ? (
+                <HaloOverlay />
+              ) : activeHat === "crown" ? (
+                <CrownOverlay />
+              ) : activeHat === "cap" ? (
+                <CapOverlay />
+              ) : null}
+            </SmoothOverlayPresence>
 
             {/* Eyewear Slot */}
-            {activeEyewear === "glasses" && <GlassesOverlay />}
-            {activeEyewear === "shades" && <ShadesOverlay />}
+            <SmoothOverlayPresence activeKey={activeEyewear}>
+              {activeEyewear === "glasses" ? (
+                <GlassesOverlay />
+              ) : activeEyewear === "shades" ? (
+                <ShadesOverlay />
+              ) : null}
+            </SmoothOverlayPresence>
 
             {/* Autonomous Face SVG */}
             <FaceOverlay
@@ -2005,7 +2446,7 @@ export function CompanionSlot({
   variant,
   className = "",
 }: {
-  variant: "peek" | "overview" | "music";
+  variant: "peek" | "overview" | "music" | "side";
   className?: string;
 }) {
   const { companionSize } = settings.use().notch;
@@ -2014,7 +2455,9 @@ export function CompanionSlot({
       ? 32
       : variant === "music"
         ? Math.round(companionSize * 0.88)
-        : companionSize;
+        : variant === "side"
+          ? Math.round(companionSize * 0.76)
+          : companionSize;
 
   return (
     <div

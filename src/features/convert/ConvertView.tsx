@@ -1,4 +1,5 @@
 import { createStore } from "../../lib/store";
+import { CompanionSlot } from "../companion/CompanionSlot";
 import { triggerCompanionMood } from "../companion/companionBrain";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
@@ -13,7 +14,6 @@ import {
   FolderOpen,
   ImageSquare,
   Sparkle,
-  UploadSimple,
   WarningCircle,
   X,
   type Icon,
@@ -50,15 +50,31 @@ const sizes = [
 ];
 
 
-export const converterStore = createStore<{ filesCount: number; isConverting: boolean }>({
+type Mode = "files" | "units";
+
+export const converterStore = createStore<{
+  mode: Mode;
+  filesCount: number;
+  isConverting: boolean;
+}>({
+  mode: "files",
   filesCount: 0,
   isConverting: false,
 });
 
-type Mode = "files" | "units";
-
 export function ConvertView() {
   const [mode, setMode] = useState<Mode>("files");
+
+  useEffect(() => {
+    converterStore.set((s) => ({ ...s, mode }));
+  }, [mode]);
+
+  useEffect(() => {
+    return () => {
+      converterStore.set((s) => ({ ...s, mode: "files" }));
+    };
+  }, []);
+
   return (
     <div className="flex h-full flex-col px-4 pt-1 pb-1">
       <HeaderActions>
@@ -102,7 +118,7 @@ function FilesPanel() {
   const [nothing, setNothing] = useState(false);
 
   useEffect(() => {
-    converterStore.set({ filesCount: files.length, isConverting: busy });
+    converterStore.set((s) => ({ ...s, filesCount: files.length, isConverting: busy }));
   }, [files.length, busy]);
 
   useEffect(() => {
@@ -124,6 +140,9 @@ function FilesPanel() {
       setFiles(p.files);
       setFfmpeg(p.ffmpeg);
       setResults(null);
+      if (p.files.length > 0) {
+        triggerCompanionMood("stamp", 1200);
+      }
       const kind = commonKind(p.files);
       // Preselect a format none of the files has yet.
       setTarget(kind ? (targets[kind].find((t) => !p.files.some((f) => sameFormat(f.ext, t))) ?? targets[kind][0]) : null);
@@ -141,28 +160,38 @@ function FilesPanel() {
   const run = async () => {
     if (!target || pending.length === 0) return;
     setBusy(true);
-    setResults(await convertFiles(pending.map((f) => f.path), target, quality, kind === "image" && size !== "0" ? Number(size) : null));
+    const startedAt = Date.now();
+    const res = await convertFiles(pending.map((f) => f.path), target, quality, kind === "image" && size !== "0" ? Number(size) : null);
+    const elapsed = Date.now() - startedAt;
+    if (elapsed < 900) {
+      await new Promise((r) => setTimeout(r, 900 - elapsed));
+    }
+    setResults(res);
     setBusy(false);
+    triggerCompanionMood("stamp", 1500);
   };
 
   const reset = () => {
     setFiles([]);
     setResults(null);
     setTarget(null);
+    triggerCompanionMood("butler-bow", 1100);
   };
 
   if (files.length === 0) {
     return (
       <motion.div
-        className={`flex h-full flex-col items-center justify-center gap-1.5 rounded-[14px] border-[1.5px] border-dashed transition-colors duration-200 ${
+        className={`flex h-full flex-col items-center justify-center gap-2 rounded-[14px] border-[1.5px] border-dashed transition-colors duration-200 ${
           dragging ? "border-label-2 bg-fill-2" : "border-fill-3 bg-fill-1"
         }`}
         animate={{ transform: dragging ? "scale(1.015)" : "scale(1)" }}
         transition={springs.snappy}
       >
-        <UploadSimple size={22} weight="bold" className={dragging ? "text-label" : "text-label-3"} />
-        <span className="text-body text-label-2">{dragging ? t("Loslassen zum Umwandeln") : t("Bilder, Audio, Video, Dokumente oder Tabellen hierher ziehen")}</span>
-        <PasteHint nothing={nothing} />
+        <CompanionSlot variant="overview" />
+        <div className="flex h-[44px] flex-col items-center justify-center gap-0.5">
+          <span className="text-body text-label-2">{dragging ? t("Loslassen zum Umwandeln") : t("Bilder, Audio, Video, Dokumente oder Tabellen hierher ziehen")}</span>
+          <PasteHint nothing={nothing} />
+        </div>
       </motion.div>
     );
   }
@@ -171,7 +200,9 @@ function FilesPanel() {
   const failed = results?.filter((r) => r.error) ?? [];
 
   return (
-    <div className="flex h-full flex-col gap-2 pl-[68px]">
+    <div className="flex h-full items-center gap-3.5 pl-1">
+      <CompanionSlot variant="side" />
+      <div className="relative flex h-full min-w-0 flex-1 flex-col gap-2">
       <div className="min-h-0 flex-1 overflow-y-auto rounded-[12px] bg-fill-1 [scrollbar-width:none]">
         {files.map((f) => {
           const I = kindIcon[f.kind];
@@ -281,6 +312,7 @@ function FilesPanel() {
           </motion.div>
         )}
       </AnimatePresence>
+      </div>
     </div>
   );
 }

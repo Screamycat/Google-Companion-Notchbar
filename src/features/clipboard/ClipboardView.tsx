@@ -1,3 +1,4 @@
+import { CompanionSlot } from "../companion/CompanionSlot";
 import { triggerCompanionMood } from "../companion/companionBrain";
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
@@ -81,6 +82,23 @@ export function ClipboardView() {
     if (previewId !== null && (hidden || !all.some((i) => i.id === previewId))) setPreviewId(null);
   }, [all, previewId, hidden]);
 
+  // Greet with a polite butler bow when entering an empty clipboard,
+  // and celebrate with a stamp hop whenever a new clip lands in the history.
+  const lastTopIdRef = useRef<number | null>(all[0]?.id ?? null);
+  useEffect(() => {
+    const topId = all[0]?.id ?? null;
+    if (topId !== null && topId !== lastTopIdRef.current) {
+      triggerCompanionMood("stamp", 1300);
+    }
+    lastTopIdRef.current = topId;
+  }, [all]);
+
+  useEffect(() => {
+    if (all.length === 0) {
+      triggerCompanionMood("butler-bow", 1200);
+    }
+  }, [all.length === 0]);
+
   // Vertical wheel → horizontal scroll.
   useEffect(() => {
     const el = scroller.current;
@@ -97,6 +115,7 @@ export function ClipboardView() {
   const copy = async (id: number) => {
     await clipboard.copy(id);
     setCopied(id);
+    triggerCompanionMood("stamp", 1300);
     scroller.current?.scrollTo({ left: 0, behavior: "smooth" });
     window.setTimeout(() => setCopied((c) => (c === id ? null : c)), 1200);
   };
@@ -119,9 +138,8 @@ export function ClipboardView() {
 
   if (all.length === 0) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-0.5 pb-2">
-        <span className="text-body text-label-2">{t("Noch nichts kopiert")}</span>
-        <span className="text-caption text-label-3">{t("Text, Links, Bilder und Dateien erscheinen hier")}</span>
+      <div className="flex h-full items-center justify-center">
+        <CompanionSlot variant="overview" />
       </div>
     );
   }
@@ -135,45 +153,48 @@ export function ClipboardView() {
           onClick={() => {
             setPreviewId(null);
             clipboard.clear();
-            triggerCompanionMood("sad", 1500);
+            triggerCompanionMood("butler-bow", 1200);
           }}
         >
           <Trash size={14} weight="bold" />
         </HeaderButton>
       </HeaderActions>
 
-      <div
-        ref={scroller}
-        className="flex shrink-0 gap-2 overflow-x-auto pr-4 pl-[68px] pt-1 [scrollbar-width:none]"
-        style={{ height: ROW_H, maskImage: "linear-gradient(90deg, transparent 48px, #000 68px, #000 calc(100% - 24px), transparent)" }}
-      >
-        {items.length === 0 && <div className="flex w-full items-center justify-center text-body text-label-3">{t("Nichts in dieser Kategorie")}</div>}
-        <AnimatePresence initial={false} mode="popLayout">
-          {items.map((item) => (
-            <motion.div
-              key={item.id}
-              layout
-              transition={springs.snappy}
-              initial={{ opacity: 0, transform: "scale(0.94)" }}
-              animate={{ opacity: 1, transform: "scale(1)" }}
-              exit={{ opacity: 0, transform: "scale(0.94)", transition: fade }}
-              className="group relative h-full w-[128px] shrink-0"
-            >
-              <Card
-                item={item}
-                now={now}
-                hidden={hidden}
-                copied={copied === item.id}
-                selected={previewId === item.id}
-                onClick={() => (item.thumbnail && !hidden ? setPreviewId((p) => (p === item.id ? null : item.id)) : void copy(item.id))}
-              />
-              <div className="absolute top-2 right-2 flex gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                {item.thumbnail && !hidden && <CardButton label={t("Kopieren")} icon={Copy} onClick={() => void copy(item.id)} />}
-                <CardButton label={t("Entfernen")} icon={X} onClick={() => clipboard.remove(item.id)} />
-              </div>
-            </motion.div>
-          ))}
-        </AnimatePresence>
+      <div className="flex shrink-0 items-center gap-3 pl-5 pr-4 pt-1" style={{ height: ROW_H }}>
+        <CompanionSlot variant="side" />
+        <div
+          ref={scroller}
+          className="flex h-full min-w-0 flex-1 gap-2 overflow-x-auto [scrollbar-width:none]"
+          style={{ maskImage: "linear-gradient(90deg, #000 0px, #000 calc(100% - 24px), transparent)" }}
+        >
+          {items.length === 0 && <div className="flex w-full items-center justify-center text-body text-label-3">{t("Nichts in dieser Kategorie")}</div>}
+          <AnimatePresence initial={false} mode="popLayout">
+            {items.map((item) => (
+              <motion.div
+                key={item.id}
+                layout
+                transition={springs.snappy}
+                initial={{ opacity: 0, transform: "scale(0.94)" }}
+                animate={{ opacity: 1, transform: "scale(1)" }}
+                exit={{ opacity: 0, transform: "scale(0.94)", transition: fade }}
+                className="group relative h-full w-[128px] shrink-0"
+              >
+                <Card
+                  item={item}
+                  now={now}
+                  hidden={hidden}
+                  copied={copied === item.id}
+                  selected={previewId === item.id}
+                  onClick={() => (item.thumbnail && !hidden ? setPreviewId((p) => (p === item.id ? null : item.id)) : void copy(item.id))}
+                />
+                <div className="absolute top-2 right-2 flex gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                  {item.thumbnail && !hidden && <CardButton label={t("Kopieren")} icon={Copy} onClick={() => void copy(item.id)} />}
+                  <CardButton label={t("Entfernen")} icon={X} onClick={() => clipboard.remove(item.id)} />
+                </div>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
       </div>
 
       <AnimatePresence>

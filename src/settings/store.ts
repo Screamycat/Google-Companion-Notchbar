@@ -171,10 +171,70 @@ export interface Settings {
     glow: "off" | "subtle" | "strong";
     icons: number;
     subtext: number;
+    customWallpaper?: {
+      dataUrl: string;
+      dimming: number; // 0..80%
+      blur: number;    // 0..24px
+      fit: "cover" | "contain";
+    };
+    dynamicWorld?: DynamicWorldConfig;
   };
 }
 
-export type AppearanceEffect = "none" | "visualizer" | "ambient" | "waves" | "aurora" | "holographic" | "topographic" | "synthwave" | "nightsky";
+export interface DynamicWorldConfig {
+  /** Time of day / sky lighting: auto (real clock) or locked preset */
+  timeMode: "auto" | "dawn" | "day" | "sunset" | "dusk" | "night";
+  /** Weather source: auto (Open-Meteo live sync) or manual toggles */
+  weatherMode: "auto" | "manual";
+  rain: "off" | "light" | "medium" | "heavy";
+  snow: "off" | "light" | "heavy";
+  clouds: "clear" | "scattered" | "overcast" | "fog";
+  thunder: boolean;
+  windLeaves: boolean;
+  celestial: "auto" | "sun" | "moon" | "off";
+  stars: "off" | "subtle" | "dense" | "meteors";
+  aurora: boolean;
+  horizon: "none" | "mountains" | "treehouse" | "city" | "ocean";
+  audioReactive: boolean;
+}
+
+export const DEFAULT_DYNAMIC_WORLD: DynamicWorldConfig = {
+  timeMode: "auto",
+  weatherMode: "auto",
+  rain: "off",
+  snow: "off",
+  clouds: "clear",
+  thunder: true,
+  windLeaves: true,
+  celestial: "auto",
+  stars: "subtle",
+  aurora: false,
+  horizon: "mountains",
+  audioReactive: true,
+};
+
+export type AppearanceEffect =
+  | "none"
+  | "dynamic-world"
+  | "visualizer"
+  | "ambient"
+  | "waves"
+  | "aurora"
+  | "holographic"
+  | "topographic"
+  | "synthwave"
+  | "nightsky"
+  | "rainy-window"
+  | "cozy-fireplace"
+  | "treehouse"
+  | "circuits"
+  | "bmo-retro"
+  | "matrix-rain"
+  | "warp-starfield"
+  | "pixel-skyline"
+  | "chromatic-prism"
+  | "celestial-nebula"
+  | "custom-image";
 
 /** Active tool IDs in the clean-slate dock. Must match `src/notch/tabs.ts`. */
 export const TOOL_IDS = ["overview", "media", "clipboard", "convert"] as const;

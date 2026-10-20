@@ -1,5 +1,27 @@
 [
   {
+    "version": "0.0.3",
+    "date": "2026-10-20",
+    "items": [
+      {
+        "de": "Dynamic World Studio: Interaktiver Hintergrund mit Echtzeit-Wettersynchronisation, Tag/Nacht-Lichtzyklus, anpassbarem Horizont (Berge, City, Ozean, Baumhaus) und lebendigen Himmelskörpern",
+        "en": "Dynamic World Studio: Interactive live background with real-time weather sync, day/night light cycle, customizable horizons (mountains, metropolis, ocean, treehouse), and glowing celestial bodies"
+      },
+      {
+        "de": "Flüssiges Hintergrund-Rendering: Seitenverhältnis-Korrektur ohne Verzerrungen, volumetrischer Bodennebel, akzentreaktive Schaltkreise und kategorisierte Hintergrund-Bibliothek (Musik, Bewegt, Statisch)",
+        "en": "Fluid Background Rendering: Aspect-ratio scaling with zero distortion, rolling volumetric ground mist, accent-reactive circuits, and categorized background library (Music, Moving, Static)"
+      },
+      {
+        "de": "Globaler Wetter-Store: Einheitlicher reaktiver Forecast-Store verhindert Abweichungen zwischen Vorschau und aktiver Notch",
+        "en": "Global Weather Store: Unified reactive forecast store eliminating split-brain state between preview and active island"
+      },
+      {
+        "de": "Living Companion in Zwischenablage & Konverter: Begleiter mit Stimmungsanimationen in den Tool-Ansichten integriert",
+        "en": "Living Companion in Clipboard & Converter: Interactive companion with live mood reactions integrated directly into tools"
+      }
+    ]
+  },
+  {
     "version": "0.0.1",
     "date": "2026-10-19",
     "items": [

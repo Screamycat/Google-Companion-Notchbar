@@ -1,29 +1,84 @@
-import { useEffect, useState } from "react";
-import { CellSignalHigh, Check, MusicNoteSimple } from "@phosphor-icons/react";
+import { useEffect, useState, useRef } from "react";
+import { CellSignalHigh, Check, ImageSquare, MusicNoteSimple, Sparkle, UploadSimple, X } from "@phosphor-icons/react";
 import { useNowPlaying } from "../../platform/media";
 import { settings, updateSettings, type AppearanceEffect, type Settings } from "../../settings/store";
-import { Group, Row, Segmented, Slider, Switch } from "../../ui/controls";
+import { Group, Row, Segmented, Slider, Switch, Button } from "../../ui/controls";
 import { Equalizer } from "../now-playing/Equalizer";
 import { BackgroundEffects } from "../../notch/BackgroundEffects";
 import { locale, t } from "../../i18n";
+import { DynamicWorldStudio } from "./DynamicWorldStudio";
 
 /*
- * Appearance tab (last tool, right before the settings gear): a live preview
- * of the notch, the background-effect picker, colours and shape & material.
- * Everything applies instantly — the tab subscribes to the settings it edits.
+ * Appearance tab: live preview of the notch, categorized background effects,
+ * custom wallpaper upload, colors, shape and material.
  */
 
-const EFFECT_ORDER: AppearanceEffect[] = ["none", "visualizer", "ambient", "waves", "aurora", "holographic", "topographic", "synthwave", "nightsky"];
+const EFFECT_ORDER: AppearanceEffect[] = [
+  "none",
+  "dynamic-world",
+  "visualizer",
+  "matrix-rain",
+  "warp-starfield",
+  "waves",
+  "pixel-skyline",
+  "rainy-window",
+  "cozy-fireplace",
+  "treehouse",
+  "circuits",
+  "aurora",
+  "ambient",
+  "celestial-nebula",
+  "chromatic-prism",
+  "synthwave",
+  "nightsky",
+  "holographic",
+  "topographic",
+  "custom-image",
+];
+
 const EFFECT_MUSIC: Record<AppearanceEffect, boolean> = {
   none: false,
+  "dynamic-world": false,
   visualizer: true,
-  ambient: true,
+  "matrix-rain": true,
+  "warp-starfield": true,
   waves: true,
-  aurora: true,
-  holographic: false,
-  topographic: false,
+  "pixel-skyline": true,
+  "rainy-window": false,
+  "cozy-fireplace": false,
+  treehouse: false,
+  circuits: false,
+  "bmo-retro": false,
+  aurora: false,
+  ambient: false,
+  "celestial-nebula": false,
+  "chromatic-prism": false,
   synthwave: false,
   nightsky: false,
+  holographic: false,
+  topographic: false,
+  "custom-image": false,
+};
+
+type EffectCategory = "all" | "music" | "moving" | "static";
+
+const CATEGORY_MAP: Record<EffectCategory, AppearanceEffect[]> = {
+  all: EFFECT_ORDER,
+  music: ["visualizer", "matrix-rain", "warp-starfield", "waves", "pixel-skyline"],
+  moving: [
+    "dynamic-world",
+    "rainy-window",
+    "cozy-fireplace",
+    "treehouse",
+    "circuits",
+    "aurora",
+    "ambient",
+    "celestial-nebula",
+    "chromatic-prism",
+    "topographic",
+    "holographic",
+  ],
+  static: ["custom-image", "synthwave", "nightsky", "none"],
 };
 
 const ACCENTS = ["#0a84ff", "#5ac8fa", "#30d158", "#ffd60a", "#ff9f0a", "#ff453a", "#bf5af2", "#ffffff"];
@@ -32,6 +87,30 @@ const DARK_SHADES = ["#000000", "#101014", "#0d1b2a", "#1a1a1e", "#12233f", "#1f
 export function AppearanceView() {
   const a = settings.use().appearance;
   const setAp = (patch: Partial<Settings["appearance"]>) => updateSettings((s) => ({ appearance: { ...s.appearance, ...patch } }));
+  const [category, setCategory] = useState<EffectCategory>("all");
+  const filteredEffects = CATEGORY_MAP[category] ?? EFFECT_ORDER;
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const onUploadFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        setAp({
+          effect: "custom-image",
+          customWallpaper: {
+            dataUrl: reader.result,
+            dimming: a.customWallpaper?.dimming ?? 40,
+            blur: a.customWallpaper?.blur ?? 0,
+            fit: a.customWallpaper?.fit ?? "cover",
+          },
+        });
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   return (
     <div
       className="h-full overflow-y-auto px-5 pt-1 pb-6 [scrollbar-width:none]"
@@ -40,19 +119,137 @@ export function AppearanceView() {
       <div className="flex flex-col gap-4">
         <Preview />
         <section>
-          <div className="mb-1 flex items-baseline justify-between gap-2 px-3">
+          <div className="mb-2 flex items-baseline justify-between gap-2 px-1">
             <h3 className="text-caption font-medium tracking-wide text-label-3 uppercase">{t("Hintergrundeffekt")}</h3>
             <span className="flex items-center gap-1 text-caption text-label-3">
               <MusicNoteSimple size={10} weight="fill" />
               {t("Effekte bewegen sich zu deiner Musik")}
             </span>
           </div>
+          <div className="mb-3">
+            <Segmented
+              id="appearance-effect-cat"
+              size="sm"
+              value={category}
+              onChange={setCategory}
+              options={[
+                { value: "all", label: t("Alle") },
+                { value: "music", label: t("Musik") },
+                { value: "moving", label: t("Bewegt") },
+                { value: "static", label: t("Statisch") },
+              ]}
+            />
+          </div>
           <div className="grid grid-cols-3 gap-x-2.5 gap-y-3">
-            {EFFECT_ORDER.map((id) => (
+            {filteredEffects.map((id) => (
               <EffectCard key={id} id={id} selected={a.effect === id} onPick={() => setAp({ effect: id })} />
             ))}
           </div>
         </section>
+
+        {a.effect === "dynamic-world" && <DynamicWorldStudio />}
+
+        {a.effect === "custom-image" && (
+          <Group title={t("Eigenes Hintergrundbild")}>
+            <Row label={t("Bilddatei")} hint={t("Wähle ein PNG, JPG, WEBP oder animiertes GIF.")}>
+              <div className="flex items-center gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  className="hidden"
+                  onChange={onUploadFile}
+                />
+                <Button
+                  onClick={() => fileInputRef.current?.click()}
+                  icon={UploadSimple}
+                >
+                  {a.customWallpaper?.dataUrl ? t("Bild ändern") : t("Bild hochladen")}
+                </Button>
+                {a.customWallpaper?.dataUrl && (
+                  <Button
+                    onClick={() =>
+                      setAp({
+                        customWallpaper: undefined,
+                        effect: "none",
+                      })
+                    }
+                    icon={X}
+                  >
+                    {t("Entfernen")}
+                  </Button>
+                )}
+              </div>
+            </Row>
+            {a.customWallpaper?.dataUrl && (
+              <>
+                <Row label={t("Einpassung")}>
+                  <Segmented
+                    id="custom-fit"
+                    size="sm"
+                    value={a.customWallpaper.fit ?? "cover"}
+                    onChange={(fit) =>
+                      setAp({
+                        customWallpaper: {
+                          ...a.customWallpaper!,
+                          fit: fit as "cover" | "contain",
+                        },
+                      })
+                    }
+                    options={[
+                      { value: "cover", label: t("Ausfüllen") },
+                      { value: "contain", label: t("Einpassen") },
+                    ]}
+                  />
+                </Row>
+                <Row label={t("Abdunkelung")} hint={t("Hält Text und Symbole gut lesbar.")}>
+                  <div className="flex w-36 items-center gap-2">
+                    <Slider
+                      label={t("Abdunkelung")}
+                      value={a.customWallpaper.dimming ?? 40}
+                      min={0}
+                      max={85}
+                      step={5}
+                      onChange={(dimming) =>
+                        setAp({
+                          customWallpaper: {
+                            ...a.customWallpaper!,
+                            dimming,
+                          },
+                        })
+                      }
+                    />
+                    <span className="w-8 text-right text-caption text-label-2 tabular">
+                      {a.customWallpaper.dimming ?? 40}%
+                    </span>
+                  </div>
+                </Row>
+                <Row label={t("Weichzeichner")}>
+                  <div className="flex w-36 items-center gap-2">
+                    <Slider
+                      label={t("Weichzeichner")}
+                      value={a.customWallpaper.blur ?? 0}
+                      min={0}
+                      max={24}
+                      step={2}
+                      onChange={(blur) =>
+                        setAp({
+                          customWallpaper: {
+                            ...a.customWallpaper!,
+                            blur,
+                          },
+                        })
+                      }
+                    />
+                    <span className="w-8 text-right text-caption text-label-2 tabular">
+                      {a.customWallpaper.blur ?? 0}px
+                    </span>
+                  </div>
+                </Row>
+              </>
+            )}
+          </Group>
+        )}
         <Group title={t("Farbe")}>
           <Row label={t("Akzent")} hint={t("Schalter, Highlights und Effekte.")}>
             <div className="flex max-w-[290px] flex-wrap items-center justify-end gap-1.5">
@@ -219,6 +416,27 @@ function effectText(id: AppearanceEffect): { name: string; desc: string } {
   switch (id) {
     case "none":
       return { name: t("Ohne"), desc: t("Sauberes Schwarz") };
+    case "dynamic-world":
+      return { name: t("Dynamische Welt"), desc: t("Echtzeit-Wetter & Tag/Nacht-Studio") };
+    case "rainy-window":
+      return { name: t("Regenfenster"), desc: t("Atmosphärische Wassertropfen") };
+    case "cozy-fireplace":
+      return { name: t("Kaminfeuer"), desc: t("Warme Glut & Funken") };
+    case "treehouse":
+      return { name: t("Baumhaus"), desc: t("Ghibli-Dämmerung & Blätter") };
+    case "circuits":
+    case "bmo-retro":
+      return { name: t("Schaltkreise"), desc: t("Vintage-Platine & Scanlines") };
+    case "matrix-rain":
+      return { name: t("Matrix Rain"), desc: t("Grüner Digitalcode im Takt") };
+    case "warp-starfield":
+      return { name: t("Warp-Antrieb"), desc: t("Hyperspace-Sternenflug") };
+    case "pixel-skyline":
+      return { name: t("Pixel Skyline"), desc: t("8-Bit Stadt bei Nacht") };
+    case "chromatic-prism":
+      return { name: t("Prisma-Brechung"), desc: t("Sanfte Regenbogen-Strahlen") };
+    case "celestial-nebula":
+      return { name: t("Sternennebel"), desc: t("Kosmische Staubwolken") };
     case "visualizer":
       return { name: t("Visualisierer"), desc: t("Balken in Albumfarben") };
     case "ambient":
@@ -235,6 +453,8 @@ function effectText(id: AppearanceEffect): { name: string; desc: string } {
       return { name: t("Holografisch"), desc: t("Schillernder Folien-Glanz") };
     case "topographic":
       return { name: t("Topografisch"), desc: t("Langsame Höhenlinien") };
+    case "custom-image":
+      return { name: t("Eigenes Bild"), desc: t("Benutzerdefiniertes Wallpaper") };
   }
 }
 
@@ -255,6 +475,12 @@ function EffectCard({ id, selected, onPick }: { id: AppearanceEffect; selected: 
             {t("Musik")}
           </span>
         )}
+        {id === "dynamic-world" && (
+          <span className="absolute bottom-1 left-1 flex items-center gap-1 rounded-full bg-indigo-500/85 px-2 py-0.5 text-[10px] font-semibold text-white shadow-[0_0_8px_rgba(99,102,241,0.6)] backdrop-blur-sm">
+            <Sparkle size={10} weight="fill" className="text-amber-300" />
+            {t("Studio")}
+          </span>
+        )}
         {selected && (
           <span className="absolute -top-1.5 -right-1.5 flex size-5 items-center justify-center rounded-full bg-[#2f7bff]">
             <Check size={12} weight="bold" className="text-white" />
@@ -269,7 +495,168 @@ function EffectCard({ id, selected, onPick }: { id: AppearanceEffect; selected: 
 
 /** Static miniature of each effect (the live versions render in the notch). */
 function EffectThumb({ id }: { id: AppearanceEffect }) {
+  const custom = settings.use().appearance.customWallpaper;
   if (id === "none") return <span className="block h-full w-full bg-black" />;
+  if (id === "custom-image") {
+    if (custom?.dataUrl) {
+      return (
+        <span className="relative block h-full w-full overflow-hidden bg-black">
+          <img src={custom.dataUrl} alt="" className="size-full object-cover" />
+          <span className="absolute inset-0 bg-black/30" />
+        </span>
+      );
+    }
+    return (
+      <span className="flex h-full w-full flex-col items-center justify-center gap-1 border border-dashed border-white/20 bg-fill-1 text-label-3">
+        <ImageSquare size={20} weight="duotone" />
+        <span className="text-[10px]">{t("Bild wählen")}</span>
+      </span>
+    );
+  }
+  if (id === "dynamic-world")
+    return (
+      <span className="relative block h-full w-full overflow-hidden bg-gradient-to-b from-[#1e40af] via-[#38bdf8] to-[#93c5fd]">
+        <span className="absolute top-1.5 right-2 size-2.5 rounded-full bg-amber-300 shadow-[0_0_6px_rgba(252,211,77,0.9)]" />
+        <svg viewBox="0 0 100 40" preserveAspectRatio="none" className="absolute bottom-0 w-full h-5 opacity-70">
+          <path d="M 0 40 L 0 25 L 25 15 L 50 25 L 75 10 L 100 20 L 100 40 Z" fill="#1e293b" />
+        </svg>
+        <span className="absolute top-2 left-3 size-1 rounded-full bg-white/70" />
+        <span className="absolute top-3 left-7 h-2 w-0.5 -rotate-12 bg-sky-100/70" />
+      </span>
+    );
+  if (id === "rainy-window")
+    return (
+      <span className="relative block h-full w-full overflow-hidden bg-gradient-to-b from-[#080c16] to-[#121a2d]">
+        <span className="absolute inset-0 opacity-40" style={{ background: "radial-gradient(circle at 50% 120%, rgba(56, 189, 248, 0.35), transparent 70%)" }} />
+        {[
+          [15, 20, 16],
+          [35, 10, 24],
+          [55, 30, 18],
+          [75, 15, 22],
+          [90, 40, 14],
+          [25, 55, 20],
+          [68, 60, 16],
+        ].map(([x, y, l], i) => (
+          <span
+            key={i}
+            className="absolute w-[1.5px] rounded-full bg-sky-200/60"
+            style={{ left: `${x}%`, top: `${y}%`, height: l }}
+          />
+        ))}
+      </span>
+    );
+  if (id === "cozy-fireplace")
+    return (
+      <span className="relative block h-full w-full overflow-hidden bg-[#070403]">
+        <span className="absolute -bottom-6 left-1/2 h-16 w-32 -translate-x-1/2 rounded-full bg-gradient-to-t from-orange-600/80 via-amber-500/50 to-transparent blur-md" />
+        {[
+          [30, 60, 2],
+          [45, 45, 1.5],
+          [55, 55, 2],
+          [65, 40, 1.5],
+          [50, 25, 1.2],
+        ].map(([x, y, s], i) => (
+          <span
+            key={i}
+            className="absolute rounded-full bg-amber-300 shadow-[0_0_4px_rgba(251,191,36,0.9)]"
+            style={{ left: `${x}%`, top: `${y}%`, width: s * 1.5, height: s * 1.5 }}
+          />
+        ))}
+      </span>
+    );
+  if (id === "treehouse")
+    return (
+      <span className="relative block h-full w-full overflow-hidden bg-gradient-to-b from-[#1c1917] via-[#292524] to-[#0c0a09]">
+        <span className="absolute -top-4 left-1/2 size-16 -translate-x-1/2 rounded-full bg-amber-500/30 blur-md" />
+        <span className="absolute bottom-0 inset-x-0 h-6 bg-[#05080f] opacity-80" />
+        <span className="absolute top-0 left-2 w-4 h-8 bg-emerald-500/60 rounded-b-full blur-[0.5px]" />
+        <span className="absolute top-0 right-3 w-4 h-9 bg-green-500/60 rounded-b-full blur-[0.5px]" />
+      </span>
+    );
+  if (id === "circuits" || id === "bmo-retro")
+    return (
+      <span className="relative block h-full w-full overflow-hidden bg-gradient-to-b from-[#0e2723] via-[#091c19] to-[#05110f]">
+        <span
+          className="absolute top-2 right-2 size-1.5 rounded-full"
+          style={{ backgroundColor: "var(--accent, #34d399)", boxShadow: "0 0 6px var(--accent, rgba(52,211,153,0.9))" }}
+        />
+        <svg viewBox="0 0 100 60" className="absolute inset-0 size-full opacity-60">
+          <path d="M 10 10 L 40 10 L 60 30 L 90 30" fill="none" stroke="var(--accent, #2dd4bf)" strokeWidth="1.5" />
+          <circle cx="10" cy="10" r="2.5" fill="var(--accent, #2dd4bf)" />
+          <circle cx="90" cy="30" r="2.5" fill="var(--accent, #2dd4bf)" />
+        </svg>
+        <span className="absolute inset-0 opacity-25" style={{ background: "repeating-linear-gradient(0deg, rgba(0,0,0,0.5) 0 1px, transparent 1px 3px)" }} />
+      </span>
+    );
+  if (id === "matrix-rain")
+    return (
+      <span className="relative block h-full w-full overflow-hidden bg-[#040906] font-mono text-[6px] text-emerald-400">
+        {[
+          [10, 0],
+          [24, -10],
+          [40, 15],
+          [56, -5],
+          [72, 8],
+          [88, -12],
+        ].map(([x, y], i) => (
+          <span key={i} className="absolute flex flex-col leading-none" style={{ left: `${x}%`, top: `${y}px` }}>
+            <span className="text-white">1</span>
+            <span className="text-emerald-300">0</span>
+            <span className="text-emerald-500">1</span>
+            <span className="text-emerald-700">0</span>
+          </span>
+        ))}
+      </span>
+    );
+  if (id === "warp-starfield")
+    return (
+      <span className="relative block h-full w-full overflow-hidden bg-[#030308]">
+        {[
+          [20, 20, 60, 40],
+          [80, 25, 55, 45],
+          [15, 75, 45, 55],
+          [85, 80, 52, 52],
+          [50, 10, 50, 35],
+          [50, 90, 50, 65],
+        ].map(([x2, y2, x1, y1], i) => (
+          <svg key={i} className="absolute inset-0 size-full">
+            <line x1={`${x1}%`} y1={`${y1}%`} x2={`${x2}%`} y2={`${y2}%`} stroke="rgba(255,255,255,0.8)" strokeWidth="1.2" strokeLinecap="round" />
+          </svg>
+        ))}
+      </span>
+    );
+  if (id === "pixel-skyline")
+    return (
+      <span className="relative block h-full w-full overflow-hidden bg-gradient-to-b from-[#180828] via-[#381446] to-[#0c0316]">
+        <span className="absolute top-2 right-4 size-3 bg-amber-200/90 shadow-[0_0_6px_rgba(253,230,138,0.6)]" />
+        <svg viewBox="0 0 100 40" preserveAspectRatio="none" className="absolute bottom-0 w-full h-8">
+          <path d="M 0 40 L 0 20 L 15 20 L 15 12 L 35 12 L 35 40 L 55 40 L 55 18 L 75 18 L 75 40 L 90 40 L 90 22 L 100 22 L 100 40 Z" fill="#0d0417" />
+          <rect x="20" y="16" width="3" height="3" fill="#fef08a" />
+          <rect x="62" y="24" width="3" height="3" fill="#67e8f9" />
+        </svg>
+      </span>
+    );
+  if (id === "chromatic-prism")
+    return (
+      <span className="relative block h-full w-full overflow-hidden bg-[#07080e]">
+        <span
+          className="absolute inset-0"
+          style={{
+            background:
+              "linear-gradient(135deg, transparent 15%, rgba(255,80,120,0.3) 35%, rgba(255,210,80,0.3) 50%, rgba(80,230,255,0.3) 65%, transparent 85%)",
+          }}
+        />
+        <span className="absolute top-0 bottom-0 left-[45%] w-8 -rotate-45 bg-white/20 blur-[6px]" />
+      </span>
+    );
+  if (id === "celestial-nebula")
+    return (
+      <span className="relative block h-full w-full overflow-hidden bg-[#04030a]">
+        <span className="absolute top-[-10%] left-[10%] size-16 rounded-full bg-violet-600/40 blur-md" />
+        <span className="absolute bottom-[-10%] right-[10%] size-14 rounded-full bg-pink-600/35 blur-md" />
+        <span className="absolute top-[30%] left-[45%] size-10 rounded-full bg-cyan-500/30 blur-md" />
+      </span>
+    );
   if (id === "visualizer")
     return (
       <span className="relative flex h-full w-full items-end justify-center gap-[3px] overflow-hidden bg-black px-3 pt-2 pb-1.5">

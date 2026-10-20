@@ -2,6 +2,8 @@ import { useState } from "react";
 import { ArrowsLeftRight } from "@phosphor-icons/react";
 import { Segmented, Select } from "../../ui/controls";
 import { locale, t } from "../../i18n";
+import { CompanionSlot } from "../companion/CompanionSlot";
+import { triggerCompanionMood } from "../companion/companionBrain";
 
 /*
  * Unit conversion (like OmniNotch's converter): length, weight, temperature,
@@ -97,43 +99,49 @@ export function UnitsPanel() {
   const options = units[cat].map((u) => ({ value: u.id, label: t(u.label) }));
 
   return (
-    <div className="flex h-full flex-col gap-3">
-      <Segmented
-        id="units-cat"
-        size="sm"
-        value={cat}
-        onChange={(c) => {
-          setCat(c);
-          setPair(defaults[c]);
-        }}
-        options={[
-          { value: "length", label: t("Länge") },
-          { value: "mass", label: t("Gewicht") },
-          { value: "temp", label: t("Temperatur") },
-          { value: "volume", label: t("Volumen") },
-          { value: "speed", label: t("Tempo") },
-        ]}
-      />
-      <div className="flex items-center gap-2">
-        <div className="flex flex-1 flex-col gap-1.5 rounded-[12px] bg-fill-1 p-2.5">
-          <input
-            value={input}
-            inputMode="decimal"
-            onChange={(e) => setInput(e.target.value.replace(/[^\d.,-]/g, ""))}
-            className="tabular w-full bg-transparent text-[22px] leading-7 font-semibold tracking-[-0.02em] text-label outline-none"
-          />
-          <Select value={from} options={options} onChange={(v) => setPair([v, to])} width="w-full" />
-        </div>
-        <button
-          aria-label={t("Tauschen")}
-          onClick={() => setPair([to, from])}
-          className="pressable pressable-fill flex size-8 shrink-0 items-center justify-center rounded-full bg-fill-2 text-label-2"
-        >
-          <ArrowsLeftRight size={14} weight="bold" />
-        </button>
-        <div className="flex flex-1 flex-col gap-1.5 rounded-[12px] bg-fill-1 p-2.5">
-          <div className="tabular truncate text-[22px] leading-7 font-semibold tracking-[-0.02em] text-label">{result === null ? "–" : format(result)}</div>
-          <Select value={to} options={options} onChange={(v) => setPair([from, v])} width="w-full" />
+    <div className="flex h-full items-center gap-3.5 pl-1">
+      <CompanionSlot variant="side" />
+      <div className="flex h-full min-w-0 flex-1 flex-col justify-center gap-3">
+        <Segmented
+          id="units-cat"
+          size="sm"
+          value={cat}
+          onChange={(c) => {
+            setCat(c);
+            setPair(defaults[c]);
+          }}
+          options={[
+            { value: "length", label: t("Länge") },
+            { value: "mass", label: t("Gewicht") },
+            { value: "temp", label: t("Temperatur") },
+            { value: "volume", label: t("Volumen") },
+            { value: "speed", label: t("Tempo") },
+          ]}
+        />
+        <div className="flex items-center gap-2">
+          <div className="flex flex-1 flex-col gap-1.5 rounded-[12px] bg-fill-1 p-2.5">
+            <input
+              value={input}
+              inputMode="decimal"
+              onChange={(e) => setInput(e.target.value.replace(/[^\d.,-]/g, ""))}
+              className="tabular w-full bg-transparent text-[22px] leading-7 font-semibold tracking-[-0.02em] text-label outline-none"
+            />
+            <Select value={from} options={options} onChange={(v) => setPair([v, to])} width="w-full" />
+          </div>
+          <button
+            aria-label={t("Tauschen")}
+            onClick={() => {
+              setPair([to, from]);
+              triggerCompanionMood("stamp", 1000);
+            }}
+            className="pressable pressable-fill flex size-8 shrink-0 items-center justify-center rounded-full bg-fill-2 text-label-2"
+          >
+            <ArrowsLeftRight size={14} weight="bold" />
+          </button>
+          <div className="flex flex-1 flex-col gap-1.5 rounded-[12px] bg-fill-1 p-2.5">
+            <div className="tabular truncate text-[22px] leading-7 font-semibold tracking-[-0.02em] text-label">{result === null ? "–" : format(result)}</div>
+            <Select value={to} options={options} onChange={(v) => setPair([from, v])} width="w-full" />
+          </div>
         </div>
       </div>
     </div>

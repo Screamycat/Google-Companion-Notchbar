@@ -21,7 +21,9 @@ export type CompanionMood =
   | "yawn"
   | "sneeze"
   | "smelting"
-  | "hungry";
+  | "hungry"
+  | "stamp"
+  | "butler-bow";
 
 
 export function triggerCompanionMood(mood: CompanionMood, durationMs = 2000) {
@@ -232,8 +234,10 @@ export const MIN_MOOD_DURATION_MS: Record<CompanionMood, number> = {
   "vibing-hard": 1200,
   "vibing-chill": 1200,
   vibing: 1200,
-  smelting: 2500,
+  smelting: 1800,
   hungry: 1500,
+  stamp: 1300,
+  "butler-bow": 1200,
   happy: 0,
 };
 
@@ -323,18 +327,6 @@ export function useCompanionBrain({
   };
 
   // Triggers an emotion and locks it for its minimum duration to avoid rapid back-and-forth jitter
-  
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const detail = (e as CustomEvent<{ mood: CompanionMood; duration: number }>).detail;
-      if (detail?.mood) {
-        triggerMood(detail.mood, detail.duration, true);
-      }
-    };
-    window.addEventListener("companion:mood", handler);
-    return () => window.removeEventListener("companion:mood", handler);
-  }, []);
-
   const triggerMood = (newMood: CompanionMood, customDurationMs?: number, force = false) => {
     const now = performance.now();
     if (!force && now < moodLockedUntilRef.current) {
@@ -358,6 +350,20 @@ export function useCompanionBrain({
       }, duration);
     }
   };
+
+  const triggerMoodRef = useRef(triggerMood);
+  triggerMoodRef.current = triggerMood;
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ mood: CompanionMood; duration: number }>).detail;
+      if (detail?.mood) {
+        triggerMoodRef.current(detail.mood, detail.duration, true);
+      }
+    };
+    window.addEventListener("companion:mood", handler);
+    return () => window.removeEventListener("companion:mood", handler);
+  }, []);
 
   // 0. Real-time Audio Listener: WASAPI loopback FFT energy, beat envelope & spectral flux analysis
   // Listens directly to the music track and dynamically shifts between:
