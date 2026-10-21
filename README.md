@@ -255,6 +255,7 @@ Follow our active feature tracking and contribute ideas on our [GitHub Milestone
 * 🤖 [**AI Companion Agency**](https://github.com/Screamycat/Google-Companion-Notchbar/milestone/5) — Outfit changes, weather control, and notch tool calling.
 * 🎧 [**Smart Music DJ**](https://github.com/Screamycat/Google-Companion-Notchbar/milestone/6) — Automated song recommendation and playback launching.
 * 🎮 [**Gaming Mode & Telemetry**](https://github.com/Screamycat/Google-Companion-Notchbar/milestone/7) — Fullscreen game detection and hardware stats.
+* 🐧 [**Linux Desktop Support**](https://github.com/Screamycat/Google-Companion-Notchbar/milestone/8) — Cross-platform Wayland & X11 compositing, PipeWire audio, and AppImage/Flatpak packaging.
 
 ---
 
