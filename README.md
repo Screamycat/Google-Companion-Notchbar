@@ -28,7 +28,7 @@
 ---
 
 <p align="center">
-  <img src="https://i.imgur.com/wcRvv0h.gif" alt="Google-Companion Notchbar in Action" width="100%" style="border-radius: 12px; box-shadow: 0 12px 40px rgba(0,0,0,0.5);" />
+  <img src="docs/assets/hero.gif" alt="Google-Companion Notchbar in Action" width="100%" />
 </p>
 
 ---
@@ -51,7 +51,7 @@ Evolved from Linux5Real's original notch concept, this project transforms the st
 The notch is designed to stay completely out of your way until you need it, morphing across 3 organic stages:
 
 <p align="center">
-  <img src="https://i.imgur.com/4xvVANW.png" alt="Mini Island Peek Mode" width="480" style="border-radius: 10px;" />
+  <img src="docs/assets/mini-island.png" alt="Mini Island Peek Mode" width="480" />
 </p>
 
 1. **Stage 1 — Hidden Trigger:** An invisible trigger zone along the top bezel of your primary or secondary display. Zero screen real estate consumed.
@@ -66,7 +66,7 @@ The notch is designed to stay completely out of your way until you need it, morp
 Your companion is not a pre-rendered video — it is a procedural, reactive desktop organism:
 
 <p align="center">
-  <img src="https://i.imgur.com/N9jWbW7.png" alt="Companion Customization Settings" width="680" style="border-radius: 10px;" />
+  <img src="docs/assets/companion-settings.png" alt="Companion Customization Settings" width="680" />
 </p>
 
 * **10 Body Shapes:** Circle, Squircle, Egg, Capsule, Slime, Hexagon, Triangle, Tower, and Scallop.
@@ -90,7 +90,7 @@ Your companion is not a pre-rendered video — it is a procedural, reactive desk
 Directly accessible from anywhere on Windows via global hotkey (`Alt + A`) or dock tab:
 
 <p align="center">
-  <img src="https://i.imgur.com/MhTyD2R.png" alt="Google Gemini AI Assistant Tab" width="680" style="border-radius: 10px;" />
+  <img src="docs/assets/gemini-ai.png" alt="Google Gemini AI Assistant Tab" width="680" />
 </p>
 
 * **Authenticated WebView2 Session:** Sign in once with your Google Account to unlock your personal Gemini plan (supports Free and Google One AI Premium).
@@ -107,7 +107,7 @@ Directly accessible from anywhere on Windows via global hotkey (`Alt + A`) or do
 Transform your notch backdrop into an atmospheric living window:
 
 <p align="center">
-  <img src="https://i.imgur.com/OUD32kx.png" alt="Dynamic World Studio Atmospheric Effects" width="680" style="border-radius: 10px;" />
+  <img src="docs/assets/dynamic-world.png" alt="Dynamic World Studio Atmospheric Effects" width="680" />
 </p>
 
 * **Celestial Simulation:** Real-time solar and lunar tracking calculating exact sun and moon altitudes based on your local clock (Dawn, Day, Sunset, Dusk, Night).
