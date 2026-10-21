@@ -43,6 +43,7 @@ interface ClipboardSource {
   clear(): void;
   /** What gets recorded (from the enabled tools); drops entries the mode doesn't keep. */
   mode(mode: ClipboardMode): void;
+  refresh(): void;
 }
 
 function createNative(): ClipboardSource {
@@ -52,7 +53,10 @@ function createNative(): ClipboardSource {
     items = next;
     listeners.forEach((l) => l());
   };
-  void invoke<ClipItem[]>("clipboard_list").then(set);
+  const refresh = () => {
+    void invoke<ClipItem[]>("clipboard_list").then(set);
+  };
+  refresh();
   void listen<ClipItem[]>("clipboard://update", (e) => set(e.payload));
 
   return {
@@ -67,6 +71,7 @@ function createNative(): ClipboardSource {
     remove: (id) => void invoke("clipboard_delete", { id }),
     clear: () => void invoke("clipboard_clear"),
     mode: (mode) => void invoke("clipboard_mode", { mode }),
+    refresh,
   };
 }
 
@@ -114,6 +119,7 @@ function createMock(): ClipboardSource {
       const keep = (i: ClipItem) => mode === "all" || (mode === "text" && (i.kind === "text" || i.kind === "link"));
       if (items.some((i) => !keep(i))) set(items.filter(keep));
     },
+    refresh: () => {},
   };
 }
 

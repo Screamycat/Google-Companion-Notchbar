@@ -5,7 +5,7 @@ import { MotionConfig } from "motion/react";
 import "./styles/global.css";
 import { Notch } from "./notch/Notch";
 import { DesktopMock } from "./dev/DesktopMock";
-import { isNative } from "./platform/native";
+import { isNative, setAiShortcut, setNotchShortcut } from "./platform/native";
 import { startDropListener } from "./platform/drop";
 import { clipboard } from "./platform/clipboard";
 import { settings } from "./settings/store";
@@ -48,6 +48,40 @@ const syncClipboardMode = () => {
 };
 syncClipboardMode();
 settings.subscribe(syncClipboardMode);
+
+// Clipboard limits & history sync to Rust
+let lastLimits = "";
+const syncClipboardLimits = () => {
+  const { clipboardMaxItems = 30, clipboardMaxImages = 6 } = settings.get();
+  const key = `${clipboardMaxItems}-${clipboardMaxImages}`;
+  if (key === lastLimits) return;
+  lastLimits = key;
+  if (isNative) void invoke("clipboard_set_limits", { maxItems: clipboardMaxItems, maxImages: clipboardMaxImages });
+};
+syncClipboardLimits();
+settings.subscribe(syncClipboardLimits);
+
+// Sync Open / Close Notch global shortcut to Rust
+let lastNotchSc = "";
+const syncNotchShortcut = () => {
+  const sc = settings.get().notchShortcut || "Ctrl+Alt+Space";
+  if (sc === lastNotchSc) return;
+  lastNotchSc = sc;
+  void setNotchShortcut(sc === "off" ? null : sc);
+};
+syncNotchShortcut();
+settings.subscribe(syncNotchShortcut);
+
+// Sync AI Assistant global shortcut to Rust on start and on every change.
+let lastAiSc = "";
+const syncAiShortcut = () => {
+  const sc = settings.get().aiShortcut || "Alt+A";
+  if (sc === lastAiSc) return;
+  lastAiSc = sc;
+  void setAiShortcut(sc === "off" ? null : sc);
+};
+syncAiShortcut();
+settings.subscribe(syncAiShortcut);
 
 // Language: update the tray menu in Rust and set the lang attribute.
 let lastLang = "";

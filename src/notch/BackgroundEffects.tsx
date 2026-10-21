@@ -44,9 +44,21 @@ function shiftHue([r, g, b]: RGB, deg: number): RGB {
   return [(pr + m) * 255, (pg + m) * 255, (pb + m) * 255];
 }
 
-export function BackgroundEffects({ effect, playing, radius }: { effect: AppearanceEffect; playing: boolean; radius: number }) {
+export function BackgroundEffects({
+  effect,
+  playing,
+  radius,
+  status,
+  activeTab,
+}: {
+  effect: AppearanceEffect;
+  playing: boolean;
+  radius: number;
+  status?: string;
+  activeTab?: string;
+}) {
   if (effect === "none") return null;
-  if (effect === "dynamic-world") return <DynamicWorldScene playing={playing} radius={radius} />;
+  if (effect === "dynamic-world") return <DynamicWorldScene playing={playing} radius={radius} status={status} activeTab={activeTab} />;
   if (effect === "synthwave") return <SynthwaveScene radius={radius} />;
   if (effect === "nightsky") return <NightSky radius={radius} />;
   if (effect === "treehouse") return <TreehouseScene radius={radius} />;

@@ -8,6 +8,7 @@ mod display;
 mod documents;
 mod drop;
 mod fps;
+mod gemini;
 mod hit_test;
 mod media;
 mod memory;
@@ -39,9 +40,111 @@ pub fn fps_elevated_unlock(sid: &str) -> i32 {
     fps::elevated_unlock(sid)
 }
 
-pub fn run() {
-    let shortcut = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::Space);
+#[derive(Default)]
+pub struct ShortcutsState {
+    pub notch: Mutex<Option<Shortcut>>,
+    pub ai: Mutex<Option<Shortcut>>,
+}
 
+fn parse_shortcut_string(s: &str) -> Option<Shortcut> {
+    let trimmed = s.trim();
+    if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("off") || trimmed.eq_ignore_ascii_case("disabled") || trimmed.eq_ignore_ascii_case("none") {
+        return None;
+    }
+    let parts: Vec<String> = trimmed
+        .split('+')
+        .map(|p| {
+            let p_trim = p.trim();
+            match p_trim.to_uppercase().as_str() {
+                "WIN" | "WINDOWS" | "META" | "CMD" | "COMMAND" | "SUPER" => "Super".to_string(),
+                "CTRL" | "CONTROL" => "Control".to_string(),
+                "ALT" | "OPTION" => "Alt".to_string(),
+                "SHIFT" => "Shift".to_string(),
+                other => other.to_string(),
+            }
+        })
+        .collect();
+    let normalized = parts.join("+");
+    normalized.parse::<Shortcut>().ok()
+}
+
+#[tauri::command]
+fn set_notch_shortcut(shortcut_str: Option<String>, app: AppHandle) -> Result<(), String> {
+    let state = app.state::<ShortcutsState>();
+    let mut lock = state.notch.lock().unwrap();
+
+    let shortcut_str = shortcut_str.filter(|s| !s.is_empty() && !s.eq_ignore_ascii_case("off") && !s.eq_ignore_ascii_case("disabled"));
+
+    if let Some(ref s) = shortcut_str {
+        let new_sc = parse_shortcut_string(s)
+            .ok_or_else(|| format!("Invalid shortcut format: '{s}'"))?;
+
+        if lock.as_ref() == Some(&new_sc) {
+            return Ok(());
+        }
+
+        if state.ai.lock().unwrap().as_ref() == Some(&new_sc) {
+            return Err("Shortcut already in use by Gemini Assistant".to_string());
+        }
+
+        if let Some(ref old) = *lock {
+            let _ = app.global_shortcut().unregister(old.clone());
+        }
+
+        app.global_shortcut()
+            .register(new_sc.clone())
+            .map_err(|e| format!("Could not register shortcut '{s}': {e}"))?;
+
+        *lock = Some(new_sc);
+        return Ok(());
+    }
+
+    if let Some(ref old) = *lock {
+        let _ = app.global_shortcut().unregister(old.clone());
+    }
+    *lock = None;
+    Ok(())
+}
+
+#[tauri::command]
+fn set_ai_shortcut(shortcut_str: Option<String>, app: AppHandle) -> Result<(), String> {
+    let state = app.state::<ShortcutsState>();
+    let mut lock = state.ai.lock().unwrap();
+
+    let shortcut_str = shortcut_str.filter(|s| !s.is_empty() && !s.eq_ignore_ascii_case("off") && !s.eq_ignore_ascii_case("disabled"));
+
+    if let Some(ref s) = shortcut_str {
+        let new_sc = parse_shortcut_string(s)
+            .ok_or_else(|| format!("Invalid shortcut format: '{s}'"))?;
+
+        if lock.as_ref() == Some(&new_sc) {
+            return Ok(());
+        }
+
+        if state.notch.lock().unwrap().as_ref() == Some(&new_sc) {
+            return Err("Shortcut already in use by Open / Close Notch".to_string());
+        }
+
+        if let Some(ref old) = *lock {
+            let _ = app.global_shortcut().unregister(old.clone());
+        }
+
+        app.global_shortcut()
+            .register(new_sc.clone())
+            .map_err(|e| format!("Could not register shortcut '{s}': {e}"))?;
+
+        *lock = Some(new_sc);
+        return Ok(());
+    }
+
+    if let Some(ref old) = *lock {
+        let _ = app.global_shortcut().unregister(old.clone());
+    }
+    *lock = None;
+    Ok(())
+}
+
+pub fn run() {
     tauri::Builder::default()
         // A second launch doesn't open a second notch.
         .plugin(tauri_plugin_single_instance::init(|_, _, _| {}))
@@ -52,8 +155,15 @@ pub fn run() {
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(move |app, pressed, event| {
-                    if pressed == &shortcut && event.state() == ShortcutState::Pressed {
-                        let _ = app.emit("notch://shortcut", ());
+                    if event.state() == ShortcutState::Pressed {
+                        let shortcuts = app.state::<ShortcutsState>();
+                        let is_notch = shortcuts.notch.lock().unwrap().as_ref() == Some(pressed);
+                        let is_ai = shortcuts.ai.lock().unwrap().as_ref() == Some(pressed);
+                        if is_notch {
+                            let _ = app.emit("notch://shortcut", ());
+                        } else if is_ai {
+                            let _ = app.emit("notch://shortcut-ai", ());
+                        }
                     }
                 })
                 .build(),
@@ -68,6 +178,8 @@ pub fn run() {
         .manage(system::SystemState::default())
         .manage(display::DisplayState::default())
         .manage(discord::DiscordState::default())
+        .manage(gemini::GeminiState::default())
+        .manage(ShortcutsState::default())
         .invoke_handler(tauri::generate_handler![
             hit_test::set_hit_rect,
             hit_test::set_pinned,
@@ -122,6 +234,16 @@ pub fn run() {
             autostart_set,
             config::config_save,
             config::config_load,
+            gemini::gemini_init,
+            gemini::gemini_open_window,
+            gemini::gemini_hide_window,
+            gemini::gemini_send,
+            gemini::gemini_abort,
+            gemini::gemini_new_chat,
+            gemini::gemini_set_model,
+            set_notch_shortcut,
+            set_ai_shortcut,
+            clipboard::clipboard_set_limits,
         ])
         .setup(move |app| {
             let window = app.get_webview_window("notch").expect("window 'notch' missing");
@@ -137,7 +259,14 @@ pub fn run() {
             audio::spawn(app.handle().clone(), &app.state::<audio::AudioState>());
 
             // If another app owns the shortcut, the notch still runs, just without it.
-            let _ = app.global_shortcut().register(shortcut);
+            let default_notch = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::Space);
+            let _ = app.global_shortcut().register(default_notch.clone());
+            let default_ai = Shortcut::new(Some(Modifiers::ALT), Code::KeyA);
+            let _ = app.global_shortcut().register(default_ai.clone());
+
+            let shortcuts_state = app.state::<ShortcutsState>();
+            *shortcuts_state.notch.lock().unwrap() = Some(default_notch);
+            *shortcuts_state.ai.lock().unwrap() = Some(default_ai);
             enable_autostart_once(app.handle());
             build_tray(app)?;
             Ok(())

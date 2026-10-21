@@ -22,6 +22,8 @@ import {
 import { useLiveMusicEnergy } from "../companion/companionBrain";
 import { fade, springs } from "../../design/motion";
 import { autostart, display, type ChangelogEntry, type MonitorInfo } from "../../platform/services";
+import { setNotchShortcut, setAiShortcut } from "../../platform/native";
+import { ShortcutRecorder } from "../../ui/ShortcutRecorder";
 import { checkForUpdate, installUpdate, update } from "../../lib/update";
 import { between, changelog, itemText, markSeen, useUnseen } from "../../lib/changelog";
 import { useNowPlaying } from "../../platform/media";
@@ -1398,6 +1400,62 @@ function GeneralPage() {
             }}
           />
         </Row>
+      </Group>
+
+      <Group title="Global Shortcuts">
+        <Row label="Open / Close Notch" hint="Global hotkey to open or dismiss Notch">
+          <ShortcutRecorder
+            value={s.notchShortcut || "Ctrl+Alt+Space"}
+            defaultValue="Ctrl+Alt+Space"
+            onChange={async (val) => {
+              try {
+                await setNotchShortcut(val === "off" ? null : val);
+                updateSettings({ notchShortcut: val });
+              } catch (e) {
+                console.error("Failed to set notch shortcut", e);
+              }
+            }}
+          />
+        </Row>
+        <Row label="Gemini Assistant" hint="Opens directly to AI tab, or closes it if already open">
+          <ShortcutRecorder
+            value={s.aiShortcut || "Alt+A"}
+            defaultValue="Alt+A"
+            onChange={async (val) => {
+              try {
+                await setAiShortcut(val === "off" ? null : val);
+                updateSettings({ aiShortcut: val });
+              } catch (e) {
+                console.error("Failed to set AI shortcut", e);
+              }
+            }}
+          />
+        </Row>
+      </Group>
+
+      <Group title="Clipboard History">
+        <SliderRow
+          label="Maximum Items"
+          hint="Maximum clips (text, links, files) kept in history"
+          value={s.clipboardMaxItems ?? 30}
+          min={10}
+          max={100}
+          step={5}
+          unit="items"
+          defaultValue={30}
+          onChange={(clipboardMaxItems) => updateSettings({ clipboardMaxItems })}
+        />
+        <SliderRow
+          label="Maximum Images"
+          hint="Maximum screenshots and copied images kept in storage"
+          value={s.clipboardMaxImages ?? 6}
+          min={1}
+          max={20}
+          step={1}
+          unit="images"
+          defaultValue={6}
+          onChange={(clipboardMaxImages) => updateSettings({ clipboardMaxImages })}
+        />
       </Group>
 
       <Group title="Weather Provider">

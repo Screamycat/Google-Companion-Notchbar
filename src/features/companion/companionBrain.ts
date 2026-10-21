@@ -542,6 +542,9 @@ export function useCompanionBrain({
 
   // Synchronize companion mood with audio state and live groove level
   useEffect(() => {
+    if (performance.now() < moodLockedUntilRef.current) {
+      return; // Prioritize explicitly triggered mood (AI assistant, poke, etc.)!
+    }
     const ambient = getAmbientMood(liveGrooveLevel);
     currentMoodRef.current = ambient;
     setMood(ambient);

@@ -4,11 +4,13 @@ import {
   ClipboardText,
   GearSix,
   MusicNotesSimple,
+  Sparkle,
   SquaresFour,
   type Icon,
 } from "@phosphor-icons/react";
 import { OverviewView } from "../features/overview/OverviewView";
 import { NowPlayingView } from "../features/now-playing/NowPlayingView";
+import { AiChatView } from "../features/ai/AiChatView";
 import { ClipboardView } from "../features/clipboard/ClipboardView";
 import { ConvertView } from "../features/convert/ConvertView";
 import { SettingsView } from "../features/settings/SettingsView";
@@ -43,6 +45,14 @@ export const tabs: NotchTab[] = [
     category: "main",
     size: { w: 540, h: 224 },
     View: NowPlayingView,
+  },
+  {
+    id: "ai",
+    label: "Gemini",
+    icon: Sparkle,
+    category: "tools",
+    size: { w: 640, h: 232 },
+    View: AiChatView,
   },
   {
     id: "clipboard",

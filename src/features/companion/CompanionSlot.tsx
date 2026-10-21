@@ -963,6 +963,7 @@ export function NotchCompanion({ status, activeTab, size, geometry, line }: Notc
   const isMusic = isOpen && activeTab === "media";
   const isClipboard = isOpen && activeTab === "clipboard";
   const isConvert = isOpen && activeTab === "convert";
+  const isAi = isOpen && activeTab === "ai";
 
   const clipItems = useClipboard();
   const hasClips = clipItems.length > 0;
@@ -971,7 +972,7 @@ export function NotchCompanion({ status, activeTab, size, geometry, line }: Notc
   const isDraggingFiles = drop.use().dragging;
 
   const isConvertEmptyDropzone = isConvert && converterMode === "files" && !hasFiles;
-  const isSideSlot = (isClipboard && hasClips) || (isConvert && !isConvertEmptyDropzone);
+  const isSideSlot = (isClipboard && hasClips) || (isConvert && !isConvertEmptyDropzone) || isAi;
 
   // Derive variant for layout sizing and positioning
   const variant: CompanionVariant = isMusic
@@ -1008,7 +1009,9 @@ export function NotchCompanion({ status, activeTab, size, geometry, line }: Notc
       ? (232 - 14) / 2
       : isConvertEmptyDropzone
         ? contentCenterY - 26
-        : contentCenterY;
+        : isAi
+          ? contentCenterY - 14
+          : contentCenterY;
 
   // Horizontal center offset (0 = center of notch):
   const musicCenterX = -size.w / 2 + 24 + musicSize / 2;
@@ -1027,7 +1030,7 @@ export function NotchCompanion({ status, activeTab, size, geometry, line }: Notc
   const targetY = Math.round(targetCenterY - targetSize / 2);
 
   // Visibility
-  const isVisible = (isPeek || isOverview || isMusic || isClipboard || isConvert) && geometry.h > 4;
+  const isVisible = (isPeek || isOverview || isMusic || isClipboard || isConvert || isAi) && geometry.h > 4;
   const targetScale = isVisible ? 1 : 0.2;
   const targetOpacity = isVisible ? 1 : 0;
 
@@ -1055,7 +1058,7 @@ export function NotchCompanion({ status, activeTab, size, geometry, line }: Notc
         ? "hungry"
         : brain.mood;
 
-  const canInteract = (isOverview || isClipboard || isConvert) && !brain.audioInfo.isMusic;
+  const canInteract = (isOverview || isClipboard || isConvert || isAi) && !brain.audioInfo.isMusic;
 
   const eyeOffset = variant === "peek" ? 2.2 : 3.8;
   const pupilX = brain.look.x * eyeOffset;

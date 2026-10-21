@@ -158,6 +158,14 @@ export interface Settings {
   presentation: { manual: boolean; auto: boolean };
   /** Check for a new version once a day, anonymously (installs only on click). */
   updates: { auto: boolean };
+  /** Global shortcut to open / close Notch (e.g. "Ctrl+Alt+Space"). */
+  notchShortcut: string;
+  /** Global shortcut to toggle AI assistant (e.g. "Alt+A"). */
+  aiShortcut: string;
+  /** Maximum number of clipboard items to keep in history. */
+  clipboardMaxItems: number;
+  /** Maximum number of clipboard images/screenshots to keep in history. */
+  clipboardMaxImages: number;
   /** Look of the notch: background effect, colours, shape and material. */
   appearance: {
     effect: AppearanceEffect;
@@ -237,7 +245,7 @@ export type AppearanceEffect =
   | "custom-image";
 
 /** Active tool IDs in the clean-slate dock. Must match `src/notch/tabs.ts`. */
-export const TOOL_IDS = ["overview", "media", "clipboard", "convert"] as const;
+export const TOOL_IDS = ["overview", "media", "ai", "clipboard", "convert"] as const;
 
 const defaults: Settings = {
   openMode: "hover",
@@ -247,6 +255,7 @@ const defaults: Settings = {
   tools: [
     { id: "overview", enabled: true, category: "main" },
     { id: "media", enabled: true, category: "main" },
+    { id: "ai", enabled: true, category: "tools" },
     { id: "clipboard", enabled: true, category: "tools" },
     { id: "convert", enabled: true, category: "tools" },
   ],
@@ -260,6 +269,10 @@ const defaults: Settings = {
   units: regionUnits(),
   presentation: { manual: false, auto: true },
   updates: { auto: true },
+  notchShortcut: "Ctrl+Alt+Space",
+  aiShortcut: "Alt+A",
+  clipboardMaxItems: 30,
+  clipboardMaxImages: 6,
   appearance: {
     effect: "none",
     closedEffect: false,
@@ -314,10 +327,11 @@ export function normalizeSettings(s: Settings): Settings {
     }));
   for (const id of TOOL_IDS) {
     if (tools.some((t) => t.id === id)) continue;
-    const defaultCat = id === "clipboard" || id === "convert" ? "tools" : "main";
+    const defaultCat = id === "clipboard" || id === "convert" || id === "ai" ? "tools" : "main";
     if (id === "overview") tools.unshift({ id, enabled: true, category: defaultCat });
     else tools.push({ id, enabled: true, category: defaultCat });
   }
+
   const notch: NotchTuning = { ...DEFAULT_NOTCH_TUNING, ...(s.notch ?? {}) };
   return {
     ...defaults,
@@ -325,6 +339,10 @@ export function normalizeSettings(s: Settings): Settings {
     openMode: notch.openMode,
     notch,
     tools,
+    notchShortcut: s.notchShortcut ?? defaults.notchShortcut,
+    aiShortcut: s.aiShortcut ?? defaults.aiShortcut,
+    clipboardMaxItems: s.clipboardMaxItems ?? defaults.clipboardMaxItems,
+    clipboardMaxImages: s.clipboardMaxImages ?? defaults.clipboardMaxImages,
     display: { ...defaults.display, ...s.display },
     gaming: { ...defaults.gaming, ...s.gaming },
     discord: { ...defaults.discord, ...s.discord },

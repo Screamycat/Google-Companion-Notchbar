@@ -45,6 +45,23 @@ export function onShortcut(handler: () => void): () => void {
   return () => void off.then((f) => f());
 }
 
+/** Global shortcut for AI assistant was pressed. */
+export function onShortcutAi(handler: () => void): () => void {
+  if (!isNative) return () => {};
+  const off = listen("notch://shortcut-ai", handler);
+  return () => void off.then((f) => f());
+}
+
+/** Configures the global shortcut to open/close Notch. */
+export async function setNotchShortcut(shortcutStr: string | null): Promise<void> {
+  if (isNative) await invoke("set_notch_shortcut", { shortcutStr });
+}
+
+/** Configures the global shortcut for AI assistant. */
+export async function setAiShortcut(shortcutStr: string | null): Promise<void> {
+  if (isNative) await invoke("set_ai_shortcut", { shortcutStr });
+}
+
 /** Tray: left click / "Open" (tab = null) or "Settings" (tab = "settings"). */
 export function onTrayOpen(handler: (tab: string | null) => void): () => void {
   if (!isNative) return () => {};

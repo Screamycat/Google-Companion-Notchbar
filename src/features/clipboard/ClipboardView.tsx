@@ -77,6 +77,11 @@ export function ClipboardView() {
   const hidden = usePresenting();
   const preview = usePreview(hidden ? null : previewId);
 
+  // Ensure fresh history whenever the clipboard view opens/mounts
+  useEffect(() => {
+    clipboard.refresh();
+  }, []);
+
   // Drop the preview when its entry disappears or the presentation mode starts.
   useEffect(() => {
     if (previewId !== null && (hidden || !all.some((i) => i.id === previewId))) setPreviewId(null);

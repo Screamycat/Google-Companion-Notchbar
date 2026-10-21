@@ -631,5 +631,20 @@
  "Zurücksetzen": "Reset",
  "Zusammenfassen": "Summarize",
  "Zwischenablage": "Clipboard",
- "Zwischenablage belegt, nochmal versuchen": "Clipboard busy, try again"
+ "Zwischenablage belegt, nochmal versuchen": "Clipboard busy, try again",
+ "Bereit": "Ready",
+ "Bitte zuerst mit Google anmelden …": "Please sign in with Google first …",
+ "Denkt nach …": "Thinking …",
+ "Frag Gemini etwas …": "Ask Gemini anything …",
+ "Google Login": "Google Sign-In",
+ "Gemini-Webfenster …": "Gemini Web Window …",
+ "Klicken, um Modell zu wechseln": "Click to switch model",
+ "Klicken, um Google-Konto oder Gemini Pro-Modell zu wechseln": "Click to switch Google account or Gemini Pro model",
+ "Melde dich einmalig im Gemini-Webfenster mit deinem Google-Konto an, um dein Gemini Pro-Abo direkt in der Notch zu nutzen.": "Sign in once in the Gemini web window with your Google account to use your Gemini Pro subscription directly in the Notch.",
+ "Mit Google Gemini verbinden": "Connect to Google Gemini",
+ "Mit Google anmelden": "Sign in with Google",
+ "Mit Google anmelden (Gemini Advanced / Pro)": "Sign in with Google (Gemini Advanced / Pro)",
+ "Stoppen": "Stop",
+ "Wie kann ich helfen?": "How can I help?",
+ "{name} reagiert live auf Geminis Antworten": "{name} reacts live to Gemini's answers"
 }

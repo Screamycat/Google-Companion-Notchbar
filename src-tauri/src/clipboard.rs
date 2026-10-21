@@ -2,8 +2,9 @@
 //!
 //! A thread polls `GetClipboardSequenceNumber` (cheap, no window needed) and reads the
 //! content on every change. Password manager content is skipped.
-//! History lives in memory only and is empty after a restart (privacy).
+//! History is persisted to disk under the app data directory (capped at 30 items and 6 images).
 
+use std::collections::HashSet;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU8, Ordering};
@@ -13,7 +14,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use arboard::{Clipboard, ImageData};
 use base64::Engine;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State};
 use windows::core::w;
 use windows::Win32::Foundation::HGLOBAL;
@@ -23,9 +24,9 @@ use windows::Win32::System::DataExchange::{
 };
 use windows::Win32::System::Memory::{GlobalLock, GlobalSize, GlobalUnlock};
 
-const MAX_ITEMS: usize = 40;
+const DEFAULT_MAX_ITEMS: usize = 30;
 /// Only the newest images are kept (stored as PNG, a screenshot is roughly 0.5–3 MB).
-const MAX_IMAGES: usize = 8;
+const DEFAULT_MAX_IMAGES: usize = 6;
 const THUMB_SIZE: u32 = 240;
 const PREVIEW_CHARS: usize = 400;
 const POLL: Duration = Duration::from_millis(300);
@@ -90,7 +91,6 @@ pub struct ClipItem {
     copied_at: u64,
 }
 
-#[derive(Default)]
 pub struct ClipboardState {
     entries: Mutex<Vec<Entry>>,
     /// Last seen sequence number. Updated on our own copies so copying an entry back
@@ -99,6 +99,21 @@ pub struct ClipboardState {
     next_id: Mutex<u64>,
     /// What gets recorded, see `Mode`. Set by the frontend from the enabled tools.
     mode: AtomicU8,
+    pub max_items: Mutex<usize>,
+    pub max_images: Mutex<usize>,
+}
+
+impl Default for ClipboardState {
+    fn default() -> Self {
+        Self {
+            entries: Mutex::new(Vec::new()),
+            last_seq: Mutex::new(0),
+            next_id: Mutex::new(0),
+            mode: AtomicU8::new(0),
+            max_items: Mutex::new(DEFAULT_MAX_ITEMS),
+            max_images: Mutex::new(DEFAULT_MAX_IMAGES),
+        }
+    }
 }
 
 /// Recording modes. `ALL` is the default, so nothing is missed before the frontend reports.
@@ -111,6 +126,34 @@ const MODE_OFF: u8 = 2;
 #[tauri::command]
 pub fn clipboard_list(state: State<'_, ClipboardState>) -> Vec<ClipItem> {
     items(&state)
+}
+
+#[tauri::command]
+pub fn clipboard_set_limits(max_items: usize, max_images: usize, app: AppHandle, state: State<'_, ClipboardState>) {
+    let items_cap = max_items.clamp(5, 200);
+    let images_cap = max_images.clamp(1, 50);
+
+    *state.max_items.lock().unwrap() = items_cap;
+    *state.max_images.lock().unwrap() = images_cap;
+
+    let before = state.entries.lock().unwrap().len();
+    {
+        let mut entries = state.entries.lock().unwrap();
+        let mut images = 0;
+        entries.retain(|e| {
+            if matches!(e.content, Content::Image(_)) {
+                images += 1;
+                images <= images_cap
+            } else {
+                true
+            }
+        });
+        entries.truncate(items_cap);
+    }
+    save_to_disk(&app, &state);
+    if state.entries.lock().unwrap().len() != before {
+        emit(&app, &state);
+    }
 }
 
 /// `mode`: "all" | "text" | "off". Drops entries the new mode doesn't keep (frees the images).
@@ -131,6 +174,7 @@ pub fn clipboard_mode(mode: &str, app: AppHandle, state: State<'_, ClipboardStat
         _ => true,
     });
     if state.entries.lock().unwrap().len() != before {
+        save_to_disk(&app, &state);
         emit(&app, &state);
     }
 }
@@ -157,6 +201,7 @@ pub fn clipboard_copy(id: u64, app: AppHandle, state: State<'_, ClipboardState>)
         entry.item.copied_at = now_ms();
         entries.insert(0, entry);
     }
+    save_to_disk(&app, &state);
     emit(&app, &state);
     Ok(())
 }
@@ -164,12 +209,14 @@ pub fn clipboard_copy(id: u64, app: AppHandle, state: State<'_, ClipboardState>)
 #[tauri::command]
 pub fn clipboard_delete(id: u64, app: AppHandle, state: State<'_, ClipboardState>) {
     state.entries.lock().unwrap().retain(|e| e.id != id);
+    save_to_disk(&app, &state);
     emit(&app, &state);
 }
 
 #[tauri::command]
 pub fn clipboard_clear(app: AppHandle, state: State<'_, ClipboardState>) {
     state.entries.lock().unwrap().clear();
+    save_to_disk(&app, &state);
     emit(&app, &state);
 }
 
@@ -246,7 +293,7 @@ pub async fn clipboard_ocr(id: u64, app: AppHandle, state: State<'_, ClipboardSt
         let mut clipboard = Clipboard::new().map_err(|e| e.to_string())?;
         clipboard.set_text(text.clone()).map_err(|e| e.to_string())?;
         *state.last_seq.lock().unwrap() = unsafe { GetClipboardSequenceNumber() };
-        add(&state, Content::Text(text.clone()));
+        add(&app, &state, Content::Text(text.clone()));
     }
     emit(&app, &state);
     Ok(text)
@@ -288,7 +335,12 @@ fn local_stamp() -> String {
 }
 
 pub fn spawn(app: AppHandle) {
+    let state = app.state::<ClipboardState>();
+    load_from_disk(&app, &state);
+
+    let app_poll = app.clone();
     thread::spawn(move || {
+        let app = app_poll;
         let formats = PrivateFormats::register();
         let state = app.state::<ClipboardState>();
         // Ignore whatever is already in the clipboard at startup.
@@ -314,7 +366,7 @@ pub fn spawn(app: AppHandle) {
             *state.last_seq.lock().unwrap() = seq;
 
             if let Some(content) = content {
-                add(&state, content);
+                add(&app, &state, content);
                 emit(&app, &state);
             }
         }
@@ -399,37 +451,85 @@ fn is_url(text: &str) -> bool {
         && (text.starts_with("http://") || text.starts_with("https://") || text.starts_with("www."))
 }
 
-fn add(state: &ClipboardState, content: Content) {
-    let mut entries = state.entries.lock().unwrap();
+fn add(app: &AppHandle, state: &ClipboardState, content: Content) {
+    {
+        let mut entries = state.entries.lock().unwrap();
 
-    // Same text copied again: move the existing entry to the top.
-    if let Content::Text(new) = &content {
-        if let Some(i) = entries.iter().position(|e| matches!(&e.content, Content::Text(t) if t == new)) {
-            let mut entry = entries.remove(i);
-            entry.item.copied_at = now_ms();
-            entries.insert(0, entry);
-            return;
+        // Deduplicate against existing entries
+        match &content {
+            Content::Text(new_text) => {
+                if let Some(i) = entries.iter().position(|e| matches!(&e.content, Content::Text(t) if t == new_text)) {
+                    if i == 0 {
+                        // Already at the top, ignore redundant sequence bump
+                        return;
+                    }
+                    let mut entry = entries.remove(i);
+                    entry.item.copied_at = now_ms();
+                    entries.insert(0, entry);
+                    drop(entries);
+                    save_to_disk(app, state);
+                    return;
+                }
+            }
+            Content::Image(new_img) => {
+                if let Some(i) = entries.iter().position(|e| match &e.content {
+                    Content::Image(img) => {
+                        img.width == new_img.width
+                            && img.height == new_img.height
+                            && (img.thumbnail == new_img.thumbnail || img.png == new_img.png)
+                    }
+                    _ => false,
+                }) {
+                    if i == 0 {
+                        // Already at the top (e.g. Snipping tool double-flush / multiple format writes), ignore!
+                        return;
+                    }
+                    let mut entry = entries.remove(i);
+                    entry.item.copied_at = now_ms();
+                    entries.insert(0, entry);
+                    drop(entries);
+                    save_to_disk(app, state);
+                    return;
+                }
+            }
+            Content::Files(new_files) => {
+                if let Some(i) = entries.iter().position(|e| matches!(&e.content, Content::Files(f) if f == new_files)) {
+                    if i == 0 {
+                        return;
+                    }
+                    let mut entry = entries.remove(i);
+                    entry.item.copied_at = now_ms();
+                    entries.insert(0, entry);
+                    drop(entries);
+                    save_to_disk(app, state);
+                    return;
+                }
+            }
         }
+
+        let id = {
+            let mut next = state.next_id.lock().unwrap();
+            *next += 1;
+            *next
+        };
+        let Some(item) = describe(id, &content) else { return };
+        entries.insert(0, Entry { id, content, item });
+
+        let max_items = *state.max_items.lock().unwrap();
+        let max_images = *state.max_images.lock().unwrap();
+
+        let mut images = 0;
+        entries.retain(|e| {
+            if matches!(e.content, Content::Image(_)) {
+                images += 1;
+                images <= max_images
+            } else {
+                true
+            }
+        });
+        entries.truncate(max_items);
     }
-
-    let id = {
-        let mut next = state.next_id.lock().unwrap();
-        *next += 1;
-        *next
-    };
-    let Some(item) = describe(id, &content) else { return };
-    entries.insert(0, Entry { id, content, item });
-
-    let mut images = 0;
-    entries.retain(|e| {
-        if matches!(e.content, Content::Image(_)) {
-            images += 1;
-            images <= MAX_IMAGES
-        } else {
-            true
-        }
-    });
-    entries.truncate(MAX_ITEMS);
+    save_to_disk(app, state);
 }
 
 fn describe(id: u64, content: &Content) -> Option<ClipItem> {
@@ -501,6 +601,209 @@ fn emit(app: &AppHandle, state: &ClipboardState) {
 
 fn now_ms() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
+}
+
+#[derive(Serialize, Deserialize)]
+enum PersistedContent {
+    Text(String),
+    Image {
+        width: u32,
+        height: u32,
+        thumbnail: String,
+    },
+    Files {
+        paths: Vec<PathBuf>,
+        folders: usize,
+        thumbnail: Option<String>,
+    },
+}
+
+#[derive(Serialize, Deserialize)]
+struct PersistedEntry {
+    id: u64,
+    copied_at: u64,
+    content: PersistedContent,
+}
+
+fn prune_images_dir(images_dir: &Path, active_image_ids: &HashSet<u64>) {
+    if let Ok(dir_entries) = std::fs::read_dir(images_dir) {
+        for entry in dir_entries.flatten() {
+            let path = entry.path();
+            if path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("png")) {
+                if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                    if let Ok(id) = stem.parse::<u64>() {
+                        if !active_image_ids.contains(&id) {
+                            let _ = std::fs::remove_file(&path);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn save_to_disk(app: &AppHandle, state: &ClipboardState) {
+    let (to_save, active_image_ids, new_images): (Vec<PersistedEntry>, HashSet<u64>, Vec<(u64, Vec<u8>)>) = {
+        let entries = state.entries.lock().unwrap();
+        let mut to_save = Vec::with_capacity(entries.len());
+        let mut active_image_ids = HashSet::new();
+        let mut new_images = Vec::new();
+
+        for e in entries.iter() {
+            match &e.content {
+                Content::Text(t) => {
+                    to_save.push(PersistedEntry {
+                        id: e.id,
+                        copied_at: e.item.copied_at,
+                        content: PersistedContent::Text(t.clone()),
+                    });
+                }
+                Content::Image(img) => {
+                    active_image_ids.insert(e.id);
+                    new_images.push((e.id, img.png.clone()));
+                    to_save.push(PersistedEntry {
+                        id: e.id,
+                        copied_at: e.item.copied_at,
+                        content: PersistedContent::Image {
+                            width: img.width,
+                            height: img.height,
+                            thumbnail: img.thumbnail.clone(),
+                        },
+                    });
+                }
+                Content::Files(paths) => {
+                    to_save.push(PersistedEntry {
+                        id: e.id,
+                        copied_at: e.item.copied_at,
+                        content: PersistedContent::Files {
+                            paths: paths.clone(),
+                            folders: e.item.folders,
+                            thumbnail: e.item.thumbnail.clone(),
+                        },
+                    });
+                }
+            }
+        }
+        (to_save, active_image_ids, new_images)
+    };
+
+    let Ok(dir) = app.path().app_data_dir() else { return };
+    let clipboard_dir = dir.join("clipboard");
+    let images_dir = clipboard_dir.join("images");
+    let _ = std::fs::create_dir_all(&images_dir);
+
+    for (id, png_bytes) in new_images {
+        let img_file = images_dir.join(format!("{id}.png"));
+        if !img_file.exists() {
+            let _ = std::fs::write(&img_file, png_bytes);
+        }
+    }
+
+    prune_images_dir(&images_dir, &active_image_ids);
+
+    let history_file = clipboard_dir.join("history.json");
+    if let Ok(json) = serde_json::to_string(&to_save) {
+        let _ = std::fs::write(history_file, json);
+    }
+}
+
+fn load_from_disk(app: &AppHandle, state: &ClipboardState) {
+    let Ok(dir) = app.path().app_data_dir() else { return };
+    let clipboard_dir = dir.join("clipboard");
+    let history_file = clipboard_dir.join("history.json");
+    let images_dir = clipboard_dir.join("images");
+
+    if !history_file.exists() {
+        return;
+    }
+
+    let Ok(json) = std::fs::read_to_string(&history_file) else { return };
+    let Ok(persisted_entries) = serde_json::from_str::<Vec<PersistedEntry>>(&json) else { return };
+
+    let mut restored_entries: Vec<Entry> = Vec::new();
+    let mut active_image_ids = HashSet::new();
+    let mut image_count = 0;
+    let max_items = *state.max_items.lock().unwrap();
+    let max_images = *state.max_images.lock().unwrap();
+
+    for p in persisted_entries {
+        if restored_entries.len() >= max_items {
+            break;
+        }
+
+        match p.content {
+            PersistedContent::Text(text) => {
+                let trimmed = text.trim();
+                let kind = if is_url(trimmed) { "link" } else { "text" };
+                let item = ClipItem {
+                    id: p.id,
+                    kind,
+                    text: trimmed.chars().take(PREVIEW_CHARS).collect(),
+                    thumbnail: None,
+                    folders: 0,
+                    copied_at: p.copied_at,
+                };
+                restored_entries.push(Entry {
+                    id: p.id,
+                    content: Content::Text(text),
+                    item,
+                });
+            }
+            PersistedContent::Image { width, height, thumbnail } => {
+                if image_count >= max_images {
+                    continue;
+                }
+                let img_path = images_dir.join(format!("{}.png", p.id));
+                if let Ok(png) = std::fs::read(&img_path) {
+                    active_image_ids.insert(p.id);
+                    image_count += 1;
+                    let item = ClipItem {
+                        id: p.id,
+                        kind: "image",
+                        text: format!("{width} × {height}"),
+                        thumbnail: Some(thumbnail.clone()),
+                        folders: 0,
+                        copied_at: p.copied_at,
+                    };
+                    restored_entries.push(Entry {
+                        id: p.id,
+                        content: Content::Image(StoredImage {
+                            width,
+                            height,
+                            png,
+                            thumbnail,
+                        }),
+                        item,
+                    });
+                }
+            }
+            PersistedContent::Files { paths, folders, thumbnail } => {
+                let names: Vec<String> = paths
+                    .iter()
+                    .map(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| p.display().to_string()))
+                    .collect();
+                let item = ClipItem {
+                    id: p.id,
+                    kind: "files",
+                    text: names.join("\n"),
+                    thumbnail,
+                    folders,
+                    copied_at: p.copied_at,
+                };
+                restored_entries.push(Entry {
+                    id: p.id,
+                    content: Content::Files(paths),
+                    item,
+                });
+            }
+        }
+    }
+
+    prune_images_dir(&images_dir, &active_image_ids);
+
+    let max_id = restored_entries.iter().map(|e| e.id).max().unwrap_or(0);
+    *state.next_id.lock().unwrap() = max_id;
+    *state.entries.lock().unwrap() = restored_entries;
 }
 
 #[cfg(test)]

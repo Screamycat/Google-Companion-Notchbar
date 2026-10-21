@@ -1,5 +1,27 @@
 [
   {
+    "version": "0.1.0",
+    "date": "2026-10-21",
+    "items": [
+      {
+        "de": "Gemini KI-Assistent & Living Companion: Vollwertiger intelligenter Assistent im Dock mit Modell-Auswahl (Flash Lite, Flash, Pro, Argon), nativer Google-Anmeldung und emotionalen BMO-Reaktionen in Echtzeit",
+        "en": "Gemini AI Assistant & Living Companion: Full AI Assistant in the dock with multi-model selection (Flash Lite, Flash, Pro, Argon), native Google Sign-In, and real-time companion mood reactions"
+      },
+      {
+        "de": "Dauerhafter Zwischenablage-Speicher: Verlauf überlebt Neustarts, neue Einstellungen für maximale Einträge/Bilder und Behebung doppelter Screenshots bei Win+Shift+S",
+        "en": "Persistent Clipboard History: History survives app restarts, with new settings for max items/images and fix for duplicate Win+Shift+S screenshots"
+      },
+      {
+        "de": "Interaktiver Tastenkürzel-Rekorder: Vollständig anpassbare globale Shortcuts für Notch und KI-Assistent mit Tastenkombinations-Aufnahme in den Einstellungen",
+        "en": "Interactive Shortcut Recorder: Fully customizable global hotkeys for Notch and AI Assistant with key combination recording in Settings"
+      },
+      {
+        "de": "Feinschliff für Tabs & Dynamic World: Dauerhafte Speicherung der Tab-Reihenfolge und verbesserte Platzierung von Sonne und Mond ohne Überlagerung der Tabs",
+        "en": "Tab Order & Dynamic World Polish: Permanent tab order persistence and improved celestial body placement without tab collisions"
+      }
+    ]
+  },
+  {
     "version": "0.0.3",
     "date": "2026-10-20",
     "items": [

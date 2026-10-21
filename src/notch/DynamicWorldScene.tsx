@@ -55,10 +55,24 @@ const SKY_PALETTES: Record<TimeOfDay, SkyPalette> = {
   },
 };
 
-export function DynamicWorldScene({ playing, radius }: { playing: boolean; radius: number }) {
+export function DynamicWorldScene({
+  playing,
+  radius,
+  status,
+  activeTab,
+}: {
+  playing: boolean;
+  radius: number;
+  status?: string;
+  activeTab?: string;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cfg: DynamicWorldConfig = settings.use().appearance.dynamicWorld ?? DEFAULT_DYNAMIC_WORLD;
   const forecast = useForecast();
+  const statusRef = useRef(status);
+  statusRef.current = status;
+  const activeTabRef = useRef(activeTab);
+  activeTabRef.current = activeTab;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -255,14 +269,15 @@ export function DynamicWorldScene({ playing, radius }: { playing: boolean; radiu
         ctx.globalCompositeOperation = "source-over";
       }
 
-      // Stars & Meteors (only visible when not full daylight or overcast)
-      const showStars = (resolvedTime === "night" || resolvedTime === "dusk" || resolvedTime === "dawn") && cloudsLevel !== "overcast";
+      // Stars & Meteors (visible during night, dusk, and dawn)
+      const showStars = (resolvedTime === "night" || resolvedTime === "dusk" || resolvedTime === "dawn");
       if (showStars && cfg.stars !== "off") {
+        const cloudFactor = cloudsLevel === "overcast" ? 0.65 : cloudsLevel === "scattered" ? 0.85 : 1;
         const starLimit = cfg.stars === "subtle" ? Math.min(25, Math.floor(w / 20)) : Math.min(stars.length, Math.floor(w / 8));
         for (let i = 0; i < starLimit; i++) {
           const st = stars[i];
           const pulse = cfg.audioReactive ? loud * 0.4 : 0;
-          const alpha = (0.3 + 0.6 * (0.5 + 0.5 * Math.sin(t * st.s + st.p)) + pulse);
+          const alpha = (0.3 + 0.6 * (0.5 + 0.5 * Math.sin(t * st.s + st.p)) + pulse) * cloudFactor;
           ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(1, alpha).toFixed(2)})`;
           ctx.beginPath();
           ctx.arc(st.rx * w, st.ry * h * 0.75, st.r, 0, Math.PI * 2);
@@ -304,8 +319,9 @@ export function DynamicWorldScene({ playing, radius }: { playing: boolean; radiu
         }
       }
 
-      // Celestial Sun / Moon (positioned in the open upper sky arch so it is never hidden behind top-right cards)
-      const celestial = cfg.celestial;
+      // Celestial Sun / Moon (skip in Clipboard / Settings tabs when open to prevent colliding with top filter pills and cards)
+      const hideCelestial = statusRef.current === "open" && (activeTabRef.current === "clipboard" || activeTabRef.current === "settings");
+      const celestial = hideCelestial ? "off" : cfg.celestial;
       const isDaySun = celestial === "sun" || (celestial === "auto" && (resolvedTime === "day" || resolvedTime === "dawn" || resolvedTime === "sunset"));
       const isNightMoon = celestial === "moon" || (celestial === "auto" && (resolvedTime === "night" || resolvedTime === "dusk"));
 

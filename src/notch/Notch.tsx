@@ -12,7 +12,7 @@ import {
 } from "@phosphor-icons/react";
 import { content, springs } from "../design/motion";
 import { media, useNowPlaying } from "../platform/media";
-import { isNative, hitExtra, keyboardFocus, onNativeBlur, onNativeHover, onShortcut, onTrayOpen, setHitRect, setMemoryLow } from "../platform/native";
+import { isNative, hitExtra, keyboardFocus, onNativeBlur, onNativeHover, onShortcut, onShortcutAi, onTrayOpen, setHitRect, setMemoryLow } from "../platform/native";
 import { useDragToMove } from "./drag";
 import { DOCK_HEIGHT, HEADER_HEIGHT, stageGeometry, type NotchGeometry } from "./geometry";
 import { HeaderButton, headerSlot } from "./header";
@@ -20,6 +20,7 @@ import { sizeOverride } from "./size";
 import { NotchShape } from "./NotchShape";
 import { BackgroundEffects } from "./BackgroundEffects";
 import { settings, type NotchTuning } from "../settings/store";
+import { aiSessionStore } from "../features/ai/aiStore";
 import { markSeen, useUnseen } from "../lib/changelog";
 import { nav, navigate } from "./nav";
 import { update } from "../lib/update";
@@ -66,6 +67,7 @@ export function Notch() {
   // Use live notchTuning openW/openH as the base open size for main tabs,
   // while allowing Settings or expanded Mixer to use their height when needed,
   // and media tab uses 224px height to avoid empty dead space.
+  const aiHeight = aiSessionStore.use().currentHeight || 232;
   const baseSize =
     tab.id === settingsTab.id
       ? { w: Math.max(notchTuning.openW, settingsTab.size.w), h: Math.max(notchTuning.openH, settingsTab.size.h) }
@@ -73,7 +75,9 @@ export function Notch() {
         ? { w: notchTuning.openW, h: 224 }
         : tab.id === "clipboard"
           ? { w: Math.max(notchTuning.openW, 580), h: 232 }
-          : { w: notchTuning.openW, h: notchTuning.openH };
+          : tab.id === "ai"
+            ? { w: Math.max(notchTuning.openW, 640), h: aiHeight }
+            : { w: notchTuning.openW, h: notchTuning.openH };
   const size = override?.tabId === tab.id ? { w: baseSize.w, h: override.h } : baseSize;
 
   const isMusicActive = Boolean(np && (np.isPlaying || np.title));
@@ -186,6 +190,21 @@ export function Notch() {
   useEffect(() => onShortcut(() => toggle() === "open" && keyboardFocus(true)), [toggle]);
   useEffect(
     () =>
+      onShortcutAi(() => {
+        if (status === "open" && tab.id === "ai") {
+          close();
+          keyboardFocus(false);
+        } else {
+          open();
+          pinned.set(true);
+          navigate("ai");
+          keyboardFocus(true);
+        }
+      }),
+    [open, close, status, tab.id],
+  );
+  useEffect(
+    () =>
       onTrayOpen((targetTab) => {
         trayTab.current = status === "open" ? null : targetTab;
         if (targetTab) navigate(targetTab);
@@ -274,7 +293,13 @@ export function Notch() {
           <NotchShape geometry={shaped} transition={transition} elevated={status !== "closed"} tone={tone}>
             {/* Background animated effects for both peek and open states */}
             {status !== "closed" && appearance.effect !== "none" && (
-              <BackgroundEffects effect={appearance.effect} playing={np?.isPlaying ?? false} radius={shaped.r} />
+              <BackgroundEffects
+                effect={appearance.effect}
+                playing={np?.isPlaying ?? false}
+                radius={shaped.r}
+                status={status}
+                activeTab={tab.id}
+              />
             )}
 
             {/* Stage 2 (Peek / Minimized Tiny Island): Living space for BMO */}
@@ -349,7 +374,7 @@ function Header({
     <div
       data-drag-handle
       onPointerDown={onDragStart}
-      className="relative flex shrink-0 items-center justify-between gap-3 pr-3 pl-5"
+      className="relative z-30 flex shrink-0 items-center justify-between gap-3 pr-3 pl-5"
       style={{ height: HEADER_HEIGHT + 4 }}
     >
       <div className="relative min-w-0 flex-1">
