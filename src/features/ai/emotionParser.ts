@@ -1,4 +1,5 @@
 import { triggerCompanionMood, type CompanionMood } from "../companion/companionBrain";
+import { settings } from "../../settings/store";
 
 const EMOTION_MAP: Record<string, { mood: CompanionMood; label: string }> = {
   happy: { mood: "happy", label: "Happy" },
@@ -80,14 +81,63 @@ const EMOTION_TAG_REGEX = new RegExp(
 const TRAILING_PARTIAL_TAG_REGEX = /(?:\[\[[A-Za-z\s]{0,16}|<(?![/a-z0-9]+\s*>)[A-Za-z]{1,14})$/;
 
 /**
- * Wraps the user's prompt with instructions so Gemini embeds companion emotion tags
- * throughout its response. Uses `[[Emotion]]` (and supports `<Emotion>`) so Google's
- * web sanitizer never strips them as raw HTML tags.
+ * Per-emotion visibility durations in milliseconds.
+ * Gives meaningful reactions ample time to be perceived and appreciated:
+ * - Complex/deep thinking: 35s
+ * - Sleepy/peaceful: 25s
+ * - Curious/wondering: 15s
+ * - Music grooving: 14s
+ * - Hype/excitement: 12s
+ * - Sad/empathetic: 10s
+ * - Happy/affectionate: 8s
+ * - Quick giggles/winks/bows: 6.5s-7s
+ */
+const MOOD_DURATIONS: Record<CompanionMood, number> = {
+  studying: 35000,
+  sleepy: 25000,
+  yawn: 8000,
+  curious: 15000,
+  vibing: 14000,
+  "vibing-chill": 14000,
+  "vibing-hard": 12000,
+  "vibing-super": 12000,
+  sad: 10000,
+  happy: 8000,
+  petting: 8000,
+  tickled: 7000,
+  winking: 6500,
+  "butler-bow": 6500,
+  angry: 9000,
+  listening: 15000,
+  sneeze: 3000,
+  smelting: 10000,
+  hungry: 8000,
+  stamp: 4000,
+};
+
+export function getEmotionDuration(mood: CompanionMood): number {
+  return MOOD_DURATIONS[mood] ?? 8000;
+}
+
+/**
+ * Wraps the user's prompt with instructions and companion self-awareness so Gemini
+ * understands who it is, embeds leading companion emotion tags, and matches response
+ * length to question depth.
  */
 export function buildEmotionPrompt(userPrompt: string): string {
+  const comp = settings.get().companion;
+  const name = comp.name?.trim() || "Companion";
+  const shape = comp.shape || "circle";
+  const color = comp.color || "white";
+  const hatDesc = comp.hat && comp.hat !== "none" ? ` wearing a ${comp.hat}` : "";
+  const eyewearDesc = comp.eyewear && comp.eyewear !== "none" ? ` wearing ${comp.eyewear}` : "";
+  const accessories = `${hatDesc}${hatDesc && eyewearDesc ? " and" : ""}${eyewearDesc}`.trim();
+  const physicalDesc = accessories ? `${color} ${shape} (${accessories})` : `${color} ${shape}`;
+
   return [
-    "[Instruction: Choose ONE fitting emotion tag at the very start of your response from: [[Happy]], [[Curious]], [[Thinking]], [[Vibing]], [[Excited]], [[Winking]], [[Laughing]], [[Proud]], [[Sleepy]], [[Sad]].",
-    "Be natural, direct, and concise: answer simple or direct questions briefly; elaborate with more detail only when a comprehensive explanation is specifically warranted. Output ONLY the leading emotion tag followed by your response.]",
+    `[Context: You are ${name}, a desktop assistant residing alongside an animated companion widget (${physicalDesc}) in the top screen notch. Do NOT roleplay, introduce yourself, or mention your body, shape, or the notch unless the user explicitly asks about you or your appearance.]`,
+    `[Instruction: Choose ONE fitting emotion tag at the very start of your response from: [[Happy]], [[Curious]], [[Thinking]], [[Vibing]], [[Excited]], [[Winking]], [[Laughing]], [[Proud]], [[Sleepy]], [[Sad]].`,
+    `Output ONLY the leading emotion tag followed by your direct response. Be direct, natural, and concise: keep answers brief for simple questions and utility tasks; elaborate thoroughly only when a deeper explanation is requested.]`,
     "",
     userPrompt.trim(),
   ].join("\n");
@@ -101,7 +151,7 @@ export interface EmotionScanResult {
 
 /**
  * Scans streaming text for newly arrived emotion tags and fires `triggerCompanionMood`
- * whenever a new tag appears in the stream.
+ * with calibrated durations whenever a new tag appears in the stream.
  */
 export function scanAndTriggerEmotions(rawText: string, previousCount: number): EmotionScanResult {
   const matches: { mood: CompanionMood; label: string }[] = [];
@@ -118,7 +168,8 @@ export function scanAndTriggerEmotions(rawText: string, previousCount: number): 
 
   if (matches.length > previousCount) {
     const latest = matches[matches.length - 1];
-    triggerCompanionMood(latest.mood, 3500);
+    const duration = getEmotionDuration(latest.mood);
+    triggerCompanionMood(latest.mood, duration);
     return {
       seenCount: matches.length,
       mood: latest.mood,
@@ -135,12 +186,12 @@ export function scanAndTriggerEmotions(rawText: string, previousCount: number): 
 }
 
 /**
- * Strips all companion emotion tags (`[[Happy]]`, `[Happy]`, `<Happy>`) and
- * trailing partial tags from the text so the user sees clean Markdown.
+ * Strips all companion emotion tags (`[[Happy]]`, `[Happy]`, `<Happy>`), prompt echoes,
+ * and trailing partial tags from the text so the user sees clean Markdown.
  */
 export function stripEmotionTags(rawText: string, isStreaming = false): string {
   let cleaned = rawText
-    .replace(/\[(?:System )?Instruction:[\s\S]*?\]\s*/gi, "")
+    .replace(/\[(?:System|Instruction|System Instruction|Context):[\s\S]*?\]\s*/gi, "")
     .replace(EMOTION_TAG_REGEX, "");
 
   if (isStreaming) {

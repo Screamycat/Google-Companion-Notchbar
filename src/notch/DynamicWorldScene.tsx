@@ -667,31 +667,40 @@ export function DynamicWorldScene({
         // Bottom wet puddle reflection in accent
         const puddle = ctx.createLinearGradient(0, h - 28, 0, h);
         puddle.addColorStop(0, "rgba(0, 0, 0, 0)");
-        puddle.addColorStop(1, css(ink, rainLevel === "heavy" ? 0.22 : 0.14));
+        puddle.addColorStop(1, css(ink, rainLevel === "heavy" ? 0.22 : rainLevel === "light" ? 0.05 : 0.14));
         ctx.fillStyle = puddle;
         ctx.fillRect(0, h - 28, w, 28);
 
         // Static condensation beads on glass
-        const activeBeads = Math.max(10, Math.min(condensationBeads.length, Math.floor(w / 18)));
+        const activeBeads = Math.max(
+          rainLevel === "light" ? 5 : 10,
+          Math.min(condensationBeads.length, Math.floor(w / (rainLevel === "light" ? 36 : 18)))
+        );
         for (let i = 0; i < activeBeads; i++) {
           const bead = condensationBeads[i];
-          ctx.fillStyle = `rgba(225, 240, 255, ${bead.alpha})`;
+          const beadAlpha = rainLevel === "light" ? bead.alpha * 0.45 : bead.alpha;
+          ctx.fillStyle = `rgba(225, 240, 255, ${beadAlpha})`;
           ctx.beginPath();
-          ctx.arc(bead.x * w, bead.y * h, bead.r, 0, Math.PI * 2);
+          ctx.arc(bead.x * w, bead.y * h, rainLevel === "light" ? bead.r * 0.75 : bead.r, 0, Math.PI * 2);
           ctx.fill();
         }
 
-        // Slanted fluid rain streaks (calibrated for high visibility in open spaces between cards)
-        const multiplier = rainLevel === "heavy" ? 1.4 : rainLevel === "light" ? 0.55 : 0.9;
+        // Slanted fluid rain streaks (calibrated for delicate drizzle vs steady rain vs downpour)
+        const multiplier = rainLevel === "heavy" ? 1.4 : rainLevel === "light" ? 0.22 : 0.9;
         const activeDrops = Math.max(
-          rainLevel === "light" ? 28 : 45,
+          rainLevel === "light" ? 10 : 45,
           Math.min(rainDrops.length, Math.floor((w / 7.5) * multiplier))
         );
-        const wind = rainLevel === "heavy" ? -0.18 : -0.1;
+        const wind = rainLevel === "heavy" ? -0.18 : rainLevel === "light" ? -0.06 : -0.1;
 
         for (let i = 0; i < activeDrops; i++) {
           const drop = rainDrops[i];
-          const speedFactor = rainLevel === "heavy" ? 0.022 : rainLevel === "medium" ? 0.017 : 0.013;
+          const speedFactor =
+            rainLevel === "heavy"
+              ? 0.022
+              : rainLevel === "light"
+              ? 0.0055
+              : 0.017;
           drop.y += (drop.speed * (speedFactor + (cfg.audioReactive ? loud * 0.01 : 0))) * TS;
           if (drop.y > 1.15) {
             drop.y = -0.1;
@@ -699,15 +708,19 @@ export function DynamicWorldScene({
           }
           const px = drop.x * w;
           const py = drop.y * h;
-          const len = Math.min(h * 0.35, drop.len * (rainLevel === "heavy" ? 1.4 : rainLevel === "medium" ? 1.1 : 0.85));
+          const len = Math.min(
+            h * 0.35,
+            drop.len * (rainLevel === "heavy" ? 1.4 : rainLevel === "light" ? 0.35 : 1.1)
+          );
 
+          const alphaMult = rainLevel === "light" ? 0.45 : 1.0;
           const dropGrad = ctx.createLinearGradient(px, py, px + len * wind, py + len);
           dropGrad.addColorStop(0, "rgba(180, 215, 255, 0)");
-          dropGrad.addColorStop(0.35, `rgba(180, 215, 255, ${drop.alpha * 0.6})`);
-          dropGrad.addColorStop(1, `rgba(230, 245, 255, ${drop.alpha * 1.1})`);
+          dropGrad.addColorStop(0.35, `rgba(180, 215, 255, ${drop.alpha * 0.6 * alphaMult})`);
+          dropGrad.addColorStop(1, `rgba(230, 245, 255, ${drop.alpha * 1.1 * alphaMult})`);
 
           ctx.strokeStyle = dropGrad;
-          ctx.lineWidth = rainLevel === "heavy" ? 1.8 : rainLevel === "medium" ? 1.4 : 1.1;
+          ctx.lineWidth = rainLevel === "heavy" ? 1.8 : rainLevel === "light" ? 0.85 : 1.4;
           ctx.lineCap = "round";
           ctx.beginPath();
           ctx.moveTo(px, py);

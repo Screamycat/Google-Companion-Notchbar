@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { Check, Copy, Sparkle, WarningCircle } from "@phosphor-icons/react";
 import { motion } from "motion/react";
+import katex from "katex";
 import { springs } from "../../design/motion";
 import type { ChatMessage } from "./aiStore";
 import { t } from "../../i18n";
@@ -173,9 +174,28 @@ function CodeBlock({ lang, code }: { lang: string; code: string }) {
   );
 }
 
+function MathBlock({ math }: { math: string }) {
+  let html = "";
+  try {
+    html = katex.renderToString(math.trim(), {
+      displayMode: true,
+      throwOnError: false,
+    });
+  } catch {
+    return <pre className="my-1.5 p-2 font-mono text-[11px] text-label">{math}</pre>;
+  }
+
+  return (
+    <div
+      className="my-2 overflow-x-auto rounded-[8px] border border-white/[0.06] bg-black/30 py-2 px-3 text-center text-label [scrollbar-width:thin]"
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  );
+}
+
 function MarkdownContent({ content }: { content: string }) {
-  // Split fenced code blocks first
-  const parts = content.split(/(```[\s\S]*?```)/g);
+  // Split fenced code blocks and display math blocks first
+  const parts = content.split(/(```[\s\S]*?```|\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\])/g);
 
   return (
     <>
@@ -186,6 +206,13 @@ function MarkdownContent({ content }: { content: string }) {
           const lang = firstNewline !== -1 ? inner.slice(0, firstNewline).trim() : "";
           const code = firstNewline !== -1 ? inner.slice(firstNewline + 1) : inner;
           return <CodeBlock key={i} lang={lang} code={code} />;
+        }
+        if (
+          (part.startsWith("$$") && part.endsWith("$$") && part.length > 4) ||
+          (part.startsWith("\\[") && part.endsWith("\\]") && part.length > 4)
+        ) {
+          const inner = part.startsWith("$$") ? part.slice(2, -2) : part.slice(2, -2);
+          return <MathBlock key={i} math={inner} />;
         }
         return <TextBlock key={i} text={part} />;
       })}
@@ -257,7 +284,8 @@ function TextBlock({ text }: { text: string }) {
 }
 
 function renderInline(text: string): ReactNode[] {
-  const tokens = text.split(/(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*)/g);
+  // Matches `code`, **bold**, *italic*, $inline math$, or \(inline math\)
+  const tokens = text.split(/(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*|\$(?!\$)[^$\n]+\$|\\\([^\n]+?\\\))/g);
   return tokens.map((tok, i) => {
     if (tok.startsWith("`") && tok.endsWith("`") && tok.length > 2) {
       return (
@@ -282,6 +310,27 @@ function renderInline(text: string): ReactNode[] {
           {tok.slice(1, -1)}
         </em>
       );
+    }
+    if (
+      (tok.startsWith("$") && tok.endsWith("$") && tok.length > 2) ||
+      (tok.startsWith("\\(") && tok.endsWith("\\)") && tok.length > 4)
+    ) {
+      const expr = tok.startsWith("$") ? tok.slice(1, -1) : tok.slice(2, -2);
+      try {
+        const html = katex.renderToString(expr.trim(), {
+          displayMode: false,
+          throwOnError: false,
+        });
+        return (
+          <span
+            key={i}
+            className="inline-math inline-block px-1 align-baseline text-white"
+            dangerouslySetInnerHTML={{ __html: html }}
+          />
+        );
+      } catch {
+        return <span key={i}>{tok}</span>;
+      }
     }
     return tok;
   });

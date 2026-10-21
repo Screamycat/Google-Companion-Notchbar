@@ -306,6 +306,51 @@ const BRIDGE_INIT_SCRIPT: &str = r#"
         return '';
       }
 
+      // Math formulas (KaTeX / MathJax / MathML / Gemini custom elements)
+      // Gemini renders math as <math-render> or <span class="katex"> or <div class="katex-display">.
+      // KaTeX renders an <annotation encoding="application/x-tex"> containing the exact raw LaTeX formula,
+      // plus duplicate visually styled HTML spans (.katex-html) and MathML (.katex-mathml).
+      // We extract ONLY the raw LaTeX formula and discard internal render artifacts to prevent duplicate text like 1/x1/x1/x or xxx!
+      if (
+        tag === 'math-render' ||
+        cls.includes('katex-display') ||
+        cls.includes('katex') ||
+        tag === 'mjx-container'
+      ) {
+        const annotation = node.querySelector('annotation');
+        const isDisplay =
+          cls.includes('katex-display') ||
+          (node.parentElement && typeof node.parentElement.className === 'string' && node.parentElement.className.includes('katex-display')) ||
+          (tag === 'math-render' && (node.getAttribute('display') === 'true' || node.getAttribute('block') === 'true'));
+
+        if (annotation && annotation.textContent) {
+          const tex = annotation.textContent.trim();
+          return isDisplay ? ('\n$$\n' + tex + '\n$$\n\n') : ('$' + tex + '$');
+        }
+
+        const dataTex = node.getAttribute('data-tex') || node.getAttribute('data-math');
+        if (dataTex) {
+          const tex = dataTex.trim();
+          return isDisplay ? ('\n$$\n' + tex + '\n$$\n\n') : ('$' + tex + '$');
+        }
+
+        const katexHtml = node.querySelector('.katex-html');
+        if (katexHtml) {
+          const tex = (katexHtml.textContent || '').trim();
+          return isDisplay ? ('\n$$\n' + tex + '\n$$\n\n') : ('$' + tex + '$');
+        }
+      }
+
+      // Ignore inner math rendering duplicates if walked directly
+      if (
+        cls.includes('katex-mathml') ||
+        cls.includes('katex-html') ||
+        tag === 'annotation' ||
+        tag === 'math'
+      ) {
+        return '';
+      }
+
       if (tag === 'code-block' || tag === 'pre') {
         const langEl = node.querySelector('.code-block-decoration span, [data-test-id="code-block-language"]');
         const lang = langEl && langEl.textContent ? langEl.textContent.trim().toLowerCase() : '';
@@ -406,14 +451,12 @@ const BRIDGE_INIT_SCRIPT: &str = r#"
       activeTimer = null;
     }
     const newChatBtn = document.querySelector(
-      'a[aria-label*="New chat" i], button[aria-label*="New chat" i], a[aria-label*="Neuer Chat" i], button[aria-label*="Neuer Chat" i], [data-test-id="new-chat-button"]'
+      'a[aria-label*="New chat" i], button[aria-label*="New chat" i], a[aria-label*="Neuer Chat" i], button[aria-label*="Neuer Chat" i], [data-test-id="new-chat-button"], [aria-label*="Start new chat" i], side-nav a[href="/app"]'
     );
     if (newChatBtn) {
       try { newChatBtn.click(); return; } catch (_) {}
     }
-    if (location.pathname !== '/app') {
-      location.href = 'https://gemini.google.com/app';
-    }
+    window.location.href = 'https://gemini.google.com/app';
   };
 
   window.__notchGeminiSend = function(promptText, requestId) {

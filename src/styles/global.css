@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "@fontsource-variable/inter/opsz.css";
+@import "katex/dist/katex.min.css";
 @import "./tokens.css";
 
 /* Registered so the accent crossfades on track change instead of jumping. */
