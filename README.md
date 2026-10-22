@@ -40,6 +40,7 @@
 Evolved from Linux5Real's original notch concept, this project transforms the static top bezel into an interactive desktop hub:
 * **A Living Companion:** An expressive buddy with tactile interactions (head pats, belly tickles, eye-tracking), autonomous idle habits, and a real-time audio DSP engine that makes it put on glowing headphones and groove to your music.
 * **Integrated Gemini AI Assistant:** Instant desktop access to Google Gemini models (Flash, Pro, Argon) with companion emotion synchronization, markdown code blocks, and KaTeX mathematical equation rendering.
+* **Smart Google Calendar & Timeline:** Live schedule hub with single-sign-on sharing, interactive month matrix, relative countdown badges, universal 1-click video/lecture links, and compact Mini-Island peek pill.
 * **Atmospheric Dynamic World Studio:** Real-time celestial day/night tracking, sun and moon positions, drifting fog, procedural rain, snow, thunder, and wind-blown autumn leaves.
 * **Smart Persistent Clipboard:** Multi-type clipboard history capturing text snippets and full-resolution screenshot thumbnails with instant paste and privacy controls.
 * **Fluid Spring Physics:** Built on Tauri 2 and 60 FPS spring animations with ultra-low resource usage (~60–80 MB RAM idle).
@@ -120,7 +121,37 @@ Transform your notch backdrop into an atmospheric living window:
 
 ---
 
-### 📋 4. Smart Persistent Clipboard Manager
+### 📅 4. Google Calendar & Smart Agenda Timeline
+A full schedule cockpit seamlessly integrated into your dock with zero extra setup:
+
+<p align="center">
+  <img src="docs/assets/calendar.png" alt="Google Calendar Tab and Agenda View" width="680" />
+</p>
+
+* **Single Google Account Session Bridge:** Piggybacks directly on your existing Gemini Google Sign-In—one login grants access to both your AI assistant and your personal schedule with zero extra tokens or authentication prompts.
+* **Interactive Month Matrix:** Clean 6-week calendar grid (Monday-first) displaying colored event indicator dots matching each calendar's accent color.
+* **Dynamic Agenda Timeline:**
+  * Toggle between **Upcoming** (chronological future events across all days) and **Day** view (selected day's events).
+  * Relative countdown badges (*"Now"*, *"in 15m"*, *"in 2h"*) keeping upcoming commitments glanceable.
+  * Location markers and detailed time spans.
+* **1-Click Universal Event Link Launcher:**
+  * Opens video meetings (Google Meet, Zoom, Teams, Webex, Jitsi, Discord) and web portals (school/lecture schedule URLs like TimeEdit, Canvas, notes, attached docs) directly in your default browser.
+  * Destination URL preview in the button hover tooltip.
+* **Mini-Island Peek Pill:**
+  * When collapsed, the compact Notch pill displays your next upcoming event title and live countdown timer.
+  * Instant 1-click toggle (`Pill: On / Off`) in the calendar header to show or hide event peeks on the fly.
+* **Living Companion Reactions:**
+  * Free days trigger the **`celebrate`** animation (joyful jumping, open `'D'` grin, and floating confetti `🎉`).
+  * Busy days trigger the **`studying`** animation with a floating open book overlay.
+  * Normal days trigger curious gaze (`curious`), event clicks trigger winks (`winking`), and event links trigger groove vibes (`vibing`).
+* **Deep Calendar Customization in Settings:**
+  * Rename long or messy schedule IDs (e.g. `TimeEdit-TKMAS-3...` ➔ *Chalmers Schema*) with inline editing.
+  * Personalize calendar badge dots using an 8-color vibrant palette picker.
+  * Individual calendar toggles to show or hide specific sub-calendars.
+
+---
+
+### 📋 5. Smart Persistent Clipboard Manager
 Never lose copied code, text, or screenshots again:
 * **Multi-Format Capture:** Automatically records copied text, code snippets, URLs, and screenshots taken with `Win + Shift + S`.
 * **Visual Image Previews:** Screenshot thumbnails with 1-click copy back to clipboard or delete.
@@ -130,13 +161,13 @@ Never lose copied code, text, or screenshots again:
 
 ---
 
-### 🎵 5. Media Playback & System Overview
+### 🎵 6. Media Playback & System Overview
 * **Media Control:** Integrates with Windows Media Session (Spotify, YouTube, Chrome, Apple Music, Tidal) with album art, track scrubbers, volume controls, and play/pause/skip.
 * **System Overview:** Live clock, auto-IP weather forecast, system volume and display brightness sliders, Bluetooth device battery indicators, and quick Sleep/Lock buttons.
 
 ---
 
-### ⌨️ 6. Custom Keybind Recorder & Modular Dock
+### ⌨️ 7. Custom Keybind Recorder & Modular Dock
 * **Interactive Shortcut Recorder:** Record any key combination directly from Settings (`Alt + A`, `Ctrl + Win`, `Ctrl + Shift + Space`) to toggle the notch or jump straight to the AI Assistant.
 * **Modular Dock Organization:** Reorder tabs via drag-and-drop, toggle visibility, and create grouped dock categories separated by vertical `|` dividers.
 
@@ -184,6 +215,7 @@ Open Settings by clicking the gear icon in the bottom dock:
 | **Appearance** | Select background engine (Dynamic World, Audio Visualizer, Aurora, Synthwave), glass transparency, and accent colors. |
 | **Size & Timing** | Tune compact peek dimensions, open window size, corner curvatures, hover delay, and mouse sensitivity. |
 | **Tabs & Dock** | Reorder tools, assign custom category groups (`|` dividers), and toggle visibility with live preview. |
+| **Calendar** | Manage connected Google calendars, toggle calendar visibility, assign friendly aliases to long schedule names, pick custom accent dot colors, and toggle Mini-Island peek pill preview. |
 | **General** | Display monitor selector, Windows autostart toggle, clipboard retention limits, custom hotkey recorder, and in-app updater. |
 
 ---
@@ -248,7 +280,7 @@ npm run build
 ## 🗺️ Roadmap & Upcoming Milestones
 
 Follow our active feature tracking and contribute ideas on our [GitHub Milestones](https://github.com/Screamycat/Google-Companion-Notchbar/milestones):
-* 📅 [**Google Calendar Tab**](https://github.com/Screamycat/Google-Companion-Notchbar/milestone/1) — Agenda timeline, countdowns, and 1-click Meet joins.
+* 📅 [**Google Calendar Tab**](https://github.com/Screamycat/Google-Companion-Notchbar/milestone/1) — **Shipped in v0.2.0!** Agenda timeline, interactive month matrix, countdowns, 1-click event links, and peek pill.
 * 📝 [**Google Keep Notes Tab**](https://github.com/Screamycat/Google-Companion-Notchbar/milestone/2) — Pastel sticky cards and quick capture directly from the notch.
 * ✅ [**Google Tasks (ToDo) Tab**](https://github.com/Screamycat/Google-Companion-Notchbar/milestone/3) — Daily checklists with celebratory companion reactions.
 * 🏠 [**Google Home & Smart IoT Bridge**](https://github.com/Screamycat/Google-Companion-Notchbar/milestone/4) — Local smart plug and light control.
