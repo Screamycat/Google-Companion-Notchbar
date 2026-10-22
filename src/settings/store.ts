@@ -39,19 +39,19 @@ export interface NotchTuning {
 }
 
 export const DEFAULT_NOTCH_TUNING: NotchTuning = {
-  hoverDelayMs: 320,
+  hoverDelayMs: 700,
   leaveDelayMs: 180,
   openMode: "hover",
   triggerW: 180,
-  triggerH: 6,
+  triggerH: 2,
   showHintLine: false,
   peekW: 164,
   peekH: 48,
   openW: 540,
   openH: 300,
-  cornerRadius: 30,
-  earRadius: 14,
-  companionSize: 78,
+  cornerRadius: 42,
+  earRadius: 24,
+  companionSize: 100,
   peekDuration: 0.28,
   peekBounce: 0.28,
   openDuration: 0.42,
@@ -103,21 +103,29 @@ export interface CompanionCustomization {
 }
 
 export const DEFAULT_COMPANION: CompanionCustomization = {
-  name: "Companion",
-  shape: "circle",
+  name: "",
+  shape: "slime",
   color: "#ffffff",
   hat: "none",
   eyewear: "none",
   smartAccessories: true,
   aura: true,
-  grooveThreshold: 35,
-  dropThreshold: 65,
+  grooveThreshold: 45,
+  dropThreshold: 80,
 };
 
 export interface ToolSetting {
   id: string;
   enabled: boolean;
   category?: string;
+}
+
+export interface CalendarSubscription {
+  id: string;
+  name: string;
+  url: string;
+  color: string;
+  enabled: boolean;
 }
 
 export interface Settings {
@@ -166,6 +174,14 @@ export interface Settings {
   clipboardMaxItems: number;
   /** Maximum number of clipboard images/screenshots to keep in history. */
   clipboardMaxImages: number;
+  /** Google Calendar integration & external schedule preferences. */
+  calendar?: {
+    showInPill: boolean;
+    disabledCalendars?: string[];
+    subscriptions?: CalendarSubscription[];
+    calendarAliases?: Record<string, string>;
+    calendarColors?: Record<string, string>;
+  };
   /** Look of the notch: background effect, colours, shape and material. */
   appearance: {
     effect: AppearanceEffect;
@@ -245,7 +261,7 @@ export type AppearanceEffect =
   | "custom-image";
 
 /** Active tool IDs in the clean-slate dock. Must match `src/notch/tabs.ts`. */
-export const TOOL_IDS = ["overview", "media", "ai", "clipboard", "convert"] as const;
+export const TOOL_IDS = ["overview", "media", "ai", "calendar", "clipboard", "convert"] as const;
 
 const defaults: Settings = {
   openMode: "hover",
@@ -253,15 +269,16 @@ const defaults: Settings = {
   notch: { ...DEFAULT_NOTCH_TUNING },
   companion: { ...DEFAULT_COMPANION },
   tools: [
-    { id: "overview", enabled: true, category: "main" },
-    { id: "media", enabled: true, category: "main" },
-    { id: "ai", enabled: true, category: "tools" },
-    { id: "clipboard", enabled: true, category: "tools" },
-    { id: "convert", enabled: true, category: "tools" },
+    { id: "ai", enabled: true, category: "main" },
+    { id: "overview", enabled: true, category: "cat-2" },
+    { id: "media", enabled: true, category: "cat-2" },
+    { id: "calendar", enabled: true, category: "cat-2" },
+    { id: "clipboard", enabled: true, category: "cat-3" },
+    { id: "convert", enabled: true, category: "cat-3" },
   ],
   weather: null,
   display: { visibility: "always", monitor: null, offset: 0, idleStyle: "notch", idleW: 188, idleH: 30 },
-  gaming: { mode: "off" },
+  gaming: { mode: "fullscreen" },
   privacyDots: false,
   discord: { clientId: "" },
   alarm: { sound: "chime", volume: 0.7, duration: 5 },
@@ -273,16 +290,23 @@ const defaults: Settings = {
   aiShortcut: "Alt+A",
   clipboardMaxItems: 30,
   clipboardMaxImages: 6,
+  calendar: {
+    showInPill: true,
+    disabledCalendars: [],
+    subscriptions: [],
+    calendarAliases: {},
+    calendarColors: {},
+  },
   appearance: {
     effect: "none",
-    closedEffect: false,
-    accent: "#4285f4",
+    closedEffect: true,
+    accent: "#9b72cb",
     resting: "#000000",
     expanded: "#000000",
     corners: "rounded",
     material: "solid",
-    cards: "dark",
-    glow: "off",
+    cards: "light",
+    glow: "strong",
     icons: 1,
     subtext: 1,
   },
@@ -327,7 +351,7 @@ export function normalizeSettings(s: Settings): Settings {
     }));
   for (const id of TOOL_IDS) {
     if (tools.some((t) => t.id === id)) continue;
-    const defaultCat = id === "clipboard" || id === "convert" || id === "ai" ? "tools" : "main";
+    const defaultCat = id === "ai" ? "main" : id === "clipboard" || id === "convert" ? "cat-3" : "cat-2";
     if (id === "overview") tools.unshift({ id, enabled: true, category: defaultCat });
     else tools.push({ id, enabled: true, category: defaultCat });
   }
@@ -343,6 +367,13 @@ export function normalizeSettings(s: Settings): Settings {
     aiShortcut: s.aiShortcut ?? defaults.aiShortcut,
     clipboardMaxItems: s.clipboardMaxItems ?? defaults.clipboardMaxItems,
     clipboardMaxImages: s.clipboardMaxImages ?? defaults.clipboardMaxImages,
+    calendar: {
+      showInPill: s.calendar?.showInPill ?? true,
+      disabledCalendars: Array.isArray(s.calendar?.disabledCalendars) ? s.calendar!.disabledCalendars : [],
+      subscriptions: Array.isArray(s.calendar?.subscriptions) ? s.calendar!.subscriptions : [],
+      calendarAliases: typeof s.calendar?.calendarAliases === "object" && s.calendar?.calendarAliases !== null ? s.calendar.calendarAliases : {},
+      calendarColors: typeof s.calendar?.calendarColors === "object" && s.calendar?.calendarColors !== null ? s.calendar.calendarColors : {},
+    },
     display: { ...defaults.display, ...s.display },
     gaming: { ...defaults.gaming, ...s.gaming },
     discord: { ...defaults.discord, ...s.discord },

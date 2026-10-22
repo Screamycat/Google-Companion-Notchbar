@@ -449,6 +449,36 @@ export function ActionParticles({ mood }: { mood: CompanionMood }) {
       </div>
     );
   }
+  if (mood === "celebrate") {
+    return (
+      <div className="pointer-events-none absolute inset-0 z-20 overflow-visible select-none">
+        <motion.div
+          className="absolute -top-3.5 -left-1 text-[13px] font-bold text-amber-300 drop-shadow-[0_2px_8px_rgba(251,191,36,0.85)]"
+          initial={{ opacity: 0, y: 6, scale: 0.3 }}
+          animate={{ opacity: [0, 1, 0], y: [-2, -26], x: [-3, -12], scale: [0.3, 1.25, 0.7], rotate: [0, -35] }}
+          transition={{ duration: 0.85, ease: "easeOut" }}
+        >
+          🎉
+        </motion.div>
+        <motion.div
+          className="absolute -top-4 right-0 text-[12px] font-bold text-pink-400 drop-shadow-[0_2px_8px_rgba(244,114,182,0.85)]"
+          initial={{ opacity: 0, y: 6, scale: 0.3 }}
+          animate={{ opacity: [0, 1, 0], y: [-2, -28], x: [3, 14], scale: [0.3, 1.3, 0.7], rotate: [0, 40] }}
+          transition={{ duration: 0.85, ease: "easeOut", delay: 0.08 }}
+        >
+          ✦
+        </motion.div>
+        <motion.div
+          className="absolute -top-5 left-3 text-[11px] font-bold text-emerald-300 drop-shadow-[0_2px_8px_rgba(110,231,183,0.85)]"
+          initial={{ opacity: 0, y: 6, scale: 0.3 }}
+          animate={{ opacity: [0, 1, 0], y: [-4, -30], x: [0, -4], scale: [0.3, 1.2, 0.6] }}
+          transition={{ duration: 0.85, ease: "easeOut", delay: 0.16 }}
+        >
+          ✧
+        </motion.div>
+      </div>
+    );
+  }
   if (mood === "stamp") {
     return (
       <div className="pointer-events-none absolute inset-0 z-20 overflow-visible select-none">
@@ -506,6 +536,17 @@ export const COMPANION_MOTION_VARIANTS: Variants = {
       duration: 0.52,
       ease: "easeOut",
       rotate: { type: "spring", stiffness: 260, damping: 18 },
+    },
+  },
+  celebrate: {
+    y: [0, -7, 2, -4, 0],
+    rotate: [0, -6, 6, -3, 3, 0],
+    scale: [1, 1.12, 0.94, 1.05, 1],
+    x: 0,
+    transition: {
+      duration: 0.7,
+      ease: "easeOut",
+      rotate: { type: "spring", stiffness: 280, damping: 16 },
     },
   },
   "butler-bow": {
@@ -734,6 +775,22 @@ export interface CompanionRigProfile {
 
 export const COMPANION_RIG_PROFILES: Record<CompanionMood | "peek", CompanionRigProfile> = {
   happy: { y: -1.1, ampY: 1.1, scale: 1, freq: 0.31 },
+  celebrate: {
+    y: -1.6,
+    ampY: 2.2,
+    ampRotate: 4.0,
+    ampScale: 0.04,
+    scale: 1.04,
+    freq: 1.8,
+    impulse: {
+      durationMs: 650,
+      sample: (t) => ({
+        scale: Math.sin(t * Math.PI) * 0.14,
+        y: -Math.sin(t * Math.PI) * 6,
+        rotate: Math.sin(t * Math.PI * 2) * 5,
+      }),
+    },
+  },
   peek: { y: 0, ampY: 0.8, scale: 1, freq: 0.31 },
   curious: { y: -0.9, ampY: 0.9, scale: 1.02, freq: 0.36 },
   "vibing-chill": { y: -0.9, ampY: 0.9, ampRotate: 4.5, scale: 1, freq: 0.36 },
@@ -964,6 +1021,7 @@ export function NotchCompanion({ status, activeTab, size, geometry, line }: Notc
   const isClipboard = isOpen && activeTab === "clipboard";
   const isConvert = isOpen && activeTab === "convert";
   const isAi = isOpen && activeTab === "ai";
+  const isCalendar = isOpen && activeTab === "calendar";
 
   const clipItems = useClipboard();
   const hasClips = clipItems.length > 0;
@@ -972,7 +1030,7 @@ export function NotchCompanion({ status, activeTab, size, geometry, line }: Notc
   const isDraggingFiles = drop.use().dragging;
 
   const isConvertEmptyDropzone = isConvert && converterMode === "files" && !hasFiles;
-  const isSideSlot = (isClipboard && hasClips) || (isConvert && !isConvertEmptyDropzone) || isAi;
+  const isSideSlot = (isClipboard && hasClips) || (isConvert && !isConvertEmptyDropzone) || isAi || isCalendar;
 
   // Derive variant for layout sizing and positioning
   const variant: CompanionVariant = isMusic
@@ -1003,15 +1061,19 @@ export function NotchCompanion({ status, activeTab, size, geometry, line }: Notc
   // an image preview below never pulls the companion down over the preview!
   // For empty Converter dropzone, offset Y by -26px to match CompanionSlot above the drop prompt.
   const contentCenterY = (size.h - 14) / 2;
+  const calendarCenterX = -size.w / 2 + 16 + 40;
+  const calendarCenterY = (size.h - 14) / 2 - 13;
   const targetCenterY = isPeek
     ? geometry.h / 2
     : isClipboard && hasClips
       ? (232 - 14) / 2
       : isConvertEmptyDropzone
         ? contentCenterY - 26
-        : isAi
-          ? contentCenterY - 14
-          : contentCenterY;
+        : isCalendar
+          ? calendarCenterY
+          : isAi
+            ? contentCenterY - 14
+            : contentCenterY;
 
   // Horizontal center offset (0 = center of notch):
   const musicCenterX = -size.w / 2 + 24 + musicSize / 2;
@@ -1021,16 +1083,18 @@ export function NotchCompanion({ status, activeTab, size, geometry, line }: Notc
     ? musicCenterX
     : isPeek
       ? peekCenterX
-      : isSideSlot
-        ? sideCenterX
-        : 0;
+      : isCalendar
+        ? calendarCenterX
+        : isSideSlot
+          ? sideCenterX
+          : 0;
 
   // Exact relative coordinate offsets from left: 50%, top: 0:
   const targetX = Math.round(targetCenterX - targetSize / 2);
   const targetY = Math.round(targetCenterY - targetSize / 2);
 
   // Visibility
-  const isVisible = (isPeek || isOverview || isMusic || isClipboard || isConvert || isAi) && geometry.h > 4;
+  const isVisible = (isPeek || isOverview || isMusic || isClipboard || isConvert || isAi || isCalendar) && geometry.h > 4;
   const targetScale = isVisible ? 1 : 0.2;
   const targetOpacity = isVisible ? 1 : 0;
 
@@ -1058,7 +1122,7 @@ export function NotchCompanion({ status, activeTab, size, geometry, line }: Notc
         ? "hungry"
         : brain.mood;
 
-  const canInteract = (isOverview || isClipboard || isConvert || isAi) && !brain.audioInfo.isMusic;
+  const canInteract = (isOverview || isClipboard || isConvert || isAi || isCalendar) && !brain.audioInfo.isMusic;
 
   const eyeOffset = variant === "peek" ? 2.2 : 3.8;
   const pupilX = brain.look.x * eyeOffset;
@@ -1081,7 +1145,7 @@ export function NotchCompanion({ status, activeTab, size, geometry, line }: Notc
 
   return (
     <motion.div
-      className="pointer-events-none absolute select-none"
+      className="pointer-events-none absolute z-40 select-none"
       style={{ left: "50%", top: 0 }}
       data-companion-container="notch"
       data-companion-name={comp.name || "Companion"}
@@ -2043,6 +2107,15 @@ export function FaceOverlay({
             <path d="M 56 43 Q 65 34 74 43" fill="none" stroke="white" strokeWidth="4.8" strokeLinecap="round" />
             <path d="M 44 59 Q 50 66 56 59" fill="none" stroke="white" strokeWidth="4.2" strokeLinecap="round" />
           </>
+        ) : mood === "celebrate" ? (
+          /* Joyful celebration face: beaming curved eyes '^ ^', wide open smiling mouth 'D', and rosy blush */
+          <>
+            <path d="M 25 42 Q 35 30 45 42" fill="none" stroke="white" strokeWidth="5.2" strokeLinecap="round" />
+            <path d="M 55 42 Q 65 30 75 42" fill="none" stroke="white" strokeWidth="5.2" strokeLinecap="round" />
+            <path d="M 40 56 Q 50 72 60 56 Z" fill="white" />
+            <circle cx="26" cy="52" r="5" fill="#f43f5e" opacity="0.85" />
+            <circle cx="74" cy="52" r="5" fill="#f43f5e" opacity="0.85" />
+          </>
         ) : mood === "vibing-super" ? (
           /* Level 3 Super Hype Bass Drop / Hardstyle: Rocking '> <' eyes, open grinning grin 'D', and hype blush */
           <>
@@ -2273,6 +2346,8 @@ export function CompanionStage({
               ? "Hmph! > <"
               : brain.mood === "sad"
                 ? "Aw…"
+                : brain.mood === "celebrate"
+                ? "Free day! Celebration time! 🎉"
                 : brain.mood === "vibing-super"
                   ? "Bass drop! ⚡"
                   : brain.mood === "vibing-hard"

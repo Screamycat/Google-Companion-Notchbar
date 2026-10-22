@@ -21,6 +21,7 @@ import { NotchShape } from "./NotchShape";
 import { BackgroundEffects } from "./BackgroundEffects";
 import { settings, type NotchTuning } from "../settings/store";
 import { aiSessionStore } from "../features/ai/aiStore";
+import { calendarStore, filterVisibleEvents, getNextPillEvent, initCalendarBridge } from "../features/calendar/calendarStore";
 import { markSeen, useUnseen } from "../lib/changelog";
 import { nav, navigate } from "./nav";
 import { update } from "../lib/update";
@@ -36,7 +37,13 @@ const MEMORY_LOW_AFTER_MS = 20_000;
 
 export function Notch() {
   const { status, open, close, dismiss, toggle, minimize, onPointerEnter, onPointerLeave } = useNotchState();
-  const { tools: toolSettings, appearance, notch: notchTuning } = settings.use();
+  const { tools: toolSettings, appearance, notch: notchTuning, calendar: calendarPrefs } = settings.use();
+  const calState = calendarStore.use();
+
+  // Warm up Google Calendar bridge on mount so cached & synced events are ready for the Peek Pill
+  useEffect(() => {
+    void initCalendarBridge();
+  }, []);
 
   const enabledTabs = toolSettings
     .filter((t) => t.enabled)
@@ -77,11 +84,17 @@ export function Notch() {
           ? { w: Math.max(notchTuning.openW, 580), h: 232 }
           : tab.id === "ai"
             ? { w: Math.max(notchTuning.openW, 640), h: aiHeight }
-            : { w: notchTuning.openW, h: notchTuning.openH };
+            : tab.id === "calendar"
+              ? { w: Math.max(notchTuning.openW, 640), h: 292 }
+              : { w: notchTuning.openW, h: notchTuning.openH };
   const size = override?.tabId === tab.id ? { w: baseSize.w, h: override.h } : baseSize;
 
   const isMusicActive = Boolean(np && (np.isPlaying || np.title));
-  const stages = stageGeometry(notchTuning, size, isMusicActive);
+  const visibleEvents = filterVisibleEvents(calState.events, calendarPrefs?.disabledCalendars);
+  const pillEvent = (calendarPrefs?.showInPill ?? true)
+    ? getNextPillEvent(visibleEvents)
+    : null;
+  const stages = stageGeometry(notchTuning, size, isMusicActive, Boolean(pillEvent));
   const shape =
     status === "open"
       ? stages.open
@@ -636,6 +649,7 @@ function TinyIslandContent({
 }) {
   const forecast = useForecast();
   const s = settings.use();
+  const calState = calendarStore.use();
   const place = s.weather;
   const comp = s.companion;
   const weather =
@@ -643,7 +657,17 @@ function TinyIslandContent({
       ? describe(forecast.current.code, forecast.current.day)
       : null;
 
+  // Keep pill countdown fresh every 30s while peeking
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNowMs(Date.now()), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
+
   const isMusic = Boolean(np && (np.isPlaying || np.title));
+  const showCalendarPill = s.calendar?.showInPill ?? true;
+  const visibleEvents = filterVisibleEvents(calState.events, s.calendar?.disabledCalendars);
+  const pillEvent = showCalendarPill ? getNextPillEvent(visibleEvents, nowMs) : null;
 
   return (
     <motion.div
@@ -711,6 +735,57 @@ function TinyIslandContent({
                 <SkipForward size={12} weight="fill" />
               </button>
             </div>
+          </motion.div>
+        ) : pillEvent ? (
+          <motion.div
+            key="calendar-event"
+            onClick={() => navigate("calendar")}
+            className="flex min-w-0 flex-1 items-center justify-between gap-2 pr-0.5"
+            initial={{ opacity: 0, filter: "blur(4px)" }}
+            animate={{ opacity: 1, filter: "blur(0px)", transition: content.enter }}
+            exit={{ opacity: 0, filter: "blur(4px)", transition: content.exit }}
+          >
+            <div className="flex min-w-0 flex-1 items-center gap-1.5">
+              <span
+                className="size-2 shrink-0 rounded-full"
+                style={{ backgroundColor: pillEvent.event.color || "#4285f4" }}
+              />
+              <div className="flex min-w-0 flex-1 flex-col justify-center leading-tight">
+                <span className="truncate text-[11px] font-semibold text-label">
+                  {pillEvent.event.title}
+                </span>
+                <span className="truncate text-[9.5px] text-label-3">
+                  {pillEvent.event.allDay
+                    ? "All day today"
+                    : pillEvent.isLive
+                      ? `${pillEvent.minutesLeft}m left`
+                      : pillEvent.minutesUntil <= 0
+                        ? "Starting now"
+                        : pillEvent.minutesUntil < 60
+                          ? `Starts in ${pillEvent.minutesUntil}m`
+                          : `In ${Math.floor(pillEvent.minutesUntil / 60)}h ${pillEvent.minutesUntil % 60}m`}
+                </span>
+              </div>
+            </div>
+            <span
+              className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9.5px] font-bold tracking-tight ${
+                pillEvent.isLive
+                  ? "bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-400/30"
+                  : pillEvent.minutesUntil <= 15
+                    ? "bg-amber-500/20 text-amber-300 ring-1 ring-amber-400/30"
+                    : "bg-blue-500/15 text-blue-300 ring-1 ring-blue-400/25"
+              }`}
+            >
+              {pillEvent.event.allDay
+                ? "Today"
+                : pillEvent.isLive
+                  ? "Live"
+                  : pillEvent.minutesUntil <= 0
+                    ? "Now"
+                    : pillEvent.minutesUntil < 60
+                      ? `${pillEvent.minutesUntil}m`
+                      : `${Math.floor(pillEvent.minutesUntil / 60)}h`}
+            </span>
           </motion.div>
         ) : (
           <motion.div

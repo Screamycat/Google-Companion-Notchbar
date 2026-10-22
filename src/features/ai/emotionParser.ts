@@ -62,6 +62,8 @@ const EMOTION_MAP: Record<string, { mood: CompanionMood; label: string }> = {
   bow: { mood: "butler-bow", label: "Polite" },
   polite: { mood: "butler-bow", label: "Polite" },
   welcome: { mood: "butler-bow", label: "Welcoming" },
+  celebrate: { mood: "celebrate", label: "Celebrating" },
+  party: { mood: "celebrate", label: "Party" },
 };
 
 const EMOTION_KEYS_PATTERN = Object.keys(EMOTION_MAP).join("|");
@@ -113,6 +115,7 @@ const MOOD_DURATIONS: Record<CompanionMood, number> = {
   smelting: 10000,
   hungry: 8000,
   stamp: 4000,
+  celebrate: 8000,
 };
 
 export function getEmotionDuration(mood: CompanionMood): number {

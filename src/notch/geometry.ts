@@ -50,7 +50,8 @@ export function openGeometry(w: number, h: number, r = 30, ear = 14): NotchGeome
 export function stageGeometry(
   notch: NotchTuning,
   tabSize?: { w: number; h: number },
-  isMusicActive = false
+  isMusicActive = false,
+  hasPillEvent = false
 ): {
   closed: NotchGeometry;
   peek: NotchGeometry;
@@ -58,7 +59,11 @@ export function stageGeometry(
 } {
   const tw = clamp(Math.round(notch.triggerW), 60, 480, 180);
   const basePw = clamp(Math.round(notch.peekW), 90, 380, 164);
-  const pw = isMusicActive ? Math.max(basePw, 280) : Math.max(basePw, 188);
+  const pw = isMusicActive
+    ? Math.max(basePw, 280)
+    : hasPillEvent
+      ? Math.max(basePw, 244)
+      : Math.max(basePw, 188);
   const ph = clamp(Math.round(notch.peekH), 36, 110, 44);
   const ow = tabSize ? tabSize.w : notch.openW;
   const oh = tabSize ? tabSize.h : notch.openH;

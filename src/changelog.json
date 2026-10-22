@@ -1,5 +1,27 @@
 [
   {
+    "version": "0.2.0",
+    "date": "2026-10-22",
+    "items": [
+      {
+        "de": "Google Kalender Tab (Milestone 1): Vollständige Kalenderintegration im Dock mit nahtlosem Login-Sharing, Monatsraster, dynamischer Termin-Agenda, Countdown-Badges und universellem Link-Öffner",
+        "en": "Google Calendar Tab (Milestone 1): Full calendar integration in the dock with seamless login-sharing, interactive month grid, dynamic agenda timeline, countdown badges, and universal event link launcher"
+      },
+      {
+        "de": "Mini-Island Peek Pill & Kalender-Einstellungen: Anzeige des nächsten anstehenden Termins in der kompakten Pille, individuelle Kalender-Farben und Umbenennung in den Einstellungen",
+        "en": "Mini-Island Peek Pill & Calendar Settings: Live upcoming event preview and countdown in the compact pill, custom calendar accent colors, and inline renaming in Settings"
+      },
+      {
+        "de": "Companion-Stimmungen & Feier-Animation: Neue Party-Animation (celebrate) mit Konfetti für freie Tage, Buch-Overlay (studying) für arbeitsreiche Tage und lebendige Reaktionen",
+        "en": "Companion Living Reactions & Celebrate Animation: Brand new celebration animation with confetti for free days, studying book overlay for busy days, and lively interactive emotions"
+      },
+      {
+        "de": "KaTeX Mathe-Formeln & Drizzle-Physik: Vollwertiges Rendering mathematischer Gleichungen im KI-Chat und verbesserte Nieselregen-Physik im Dynamic World Studio",
+        "en": "KaTeX Math Rendering & Drizzle Physics: Full mathematical formula rendering in Gemini AI chat and realistic gentle drizzle weather simulation in Dynamic World Studio"
+      }
+    ]
+  },
+  {
     "version": "0.1.0",
     "date": "2026-10-21",
     "items": [

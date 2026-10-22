@@ -1,6 +1,7 @@
 import type { ComponentType } from "react";
 import {
   ArrowsLeftRight,
+  CalendarBlank,
   ClipboardText,
   GearSix,
   MusicNotesSimple,
@@ -11,6 +12,7 @@ import {
 import { OverviewView } from "../features/overview/OverviewView";
 import { NowPlayingView } from "../features/now-playing/NowPlayingView";
 import { AiChatView } from "../features/ai/AiChatView";
+import { CalendarView } from "../features/calendar/CalendarView";
 import { ClipboardView } from "../features/clipboard/ClipboardView";
 import { ConvertView } from "../features/convert/ConvertView";
 import { SettingsView } from "../features/settings/SettingsView";
@@ -53,6 +55,14 @@ export const tabs: NotchTab[] = [
     category: "tools",
     size: { w: 640, h: 232 },
     View: AiChatView,
+  },
+  {
+    id: "calendar",
+    label: "Calendar",
+    icon: CalendarBlank,
+    category: "tools",
+    size: { w: 640, h: 292 },
+    View: CalendarView,
   },
   {
     id: "clipboard",

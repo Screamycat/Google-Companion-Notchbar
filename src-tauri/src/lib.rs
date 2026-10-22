@@ -1,5 +1,6 @@
 mod audio;
 mod bluetooth;
+mod calendar;
 mod clipboard;
 mod controls;
 pub mod convert;
@@ -179,6 +180,7 @@ pub fn run() {
         .manage(display::DisplayState::default())
         .manage(discord::DiscordState::default())
         .manage(gemini::GeminiState::default())
+        .manage(calendar::CalendarState::default())
         .manage(ShortcutsState::default())
         .invoke_handler(tauri::generate_handler![
             hit_test::set_hit_rect,
@@ -241,6 +243,12 @@ pub fn run() {
             gemini::gemini_abort,
             gemini::gemini_new_chat,
             gemini::gemini_set_model,
+            calendar::calendar_init,
+            calendar::calendar_get_events,
+            calendar::calendar_sync,
+            calendar::calendar_open_auth,
+            calendar::calendar_fetch_url,
+            calendar::calendar_open_url,
             set_notch_shortcut,
             set_ai_shortcut,
             clipboard::clipboard_set_limits,

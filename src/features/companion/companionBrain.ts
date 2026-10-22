@@ -23,7 +23,8 @@ export type CompanionMood =
   | "smelting"
   | "hungry"
   | "stamp"
-  | "butler-bow";
+  | "butler-bow"
+  | "celebrate";
 
 
 export function triggerCompanionMood(mood: CompanionMood, durationMs = 2000) {
@@ -238,6 +239,7 @@ export const MIN_MOOD_DURATION_MS: Record<CompanionMood, number> = {
   hungry: 1500,
   stamp: 1300,
   "butler-bow": 1200,
+  celebrate: 1600,
   happy: 0,
 };
 

@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, Reorder } from "motion/react";
 import {
   ArrowCounterClockwise,
+  CalendarBlank,
   CellSignalHigh,
   Check,
   CornersOut,
@@ -11,14 +12,27 @@ import {
   Minus,
   MusicNoteSimple,
   Palette,
+  PencilSimple,
   Plus,
   Smiley,
   Sparkle,
   SquaresFour,
+  Trash,
   UploadSimple,
   X,
   type Icon,
 } from "@phosphor-icons/react";
+import {
+  calendarStore,
+  getCalendarList,
+  openCalendarAuthWindow,
+  removeCalendarSubscription,
+  renameCalendar,
+  setCalendarColor,
+  syncCalendar,
+  toggleAllCalendars,
+  toggleCalendar,
+} from "../calendar/calendarStore";
 import { useLiveMusicEnergy } from "../companion/companionBrain";
 import { fade, springs } from "../../design/motion";
 import { autostart, display, type ChangelogEntry, type MonitorInfo } from "../../platform/services";
@@ -28,6 +42,7 @@ import { checkForUpdate, installUpdate, update } from "../../lib/update";
 import { between, changelog, itemText, markSeen, useUnseen } from "../../lib/changelog";
 import { useNowPlaying } from "../../platform/media";
 import { findTab } from "../../notch/tabs";
+import { nav, navigate } from "../../notch/nav";
 import {
   DEFAULT_NOTCH_TUNING,
   resetNotchTuning,
@@ -52,17 +67,23 @@ import { Equalizer } from "../now-playing/Equalizer";
 import { PlaceSearch } from "../weather/WeatherView";
 import { detectPlace } from "../weather/store";
 
-type PageId = "companion" | "appearance" | "geometry" | "tabs" | "general";
+export type SettingsPageId = "companion" | "appearance" | "geometry" | "tabs" | "calendar" | "general";
 
-const pages: { id: PageId; label: string; icon: Icon }[] = [
+const pages: { id: SettingsPageId; label: string; icon: Icon }[] = [
   { id: "companion", label: "Companion", icon: Smiley },
   { id: "appearance", label: "Appearance", icon: Palette },
   { id: "geometry", label: "Size & Timing", icon: CornersOut },
   { id: "tabs", label: "Tabs", icon: SquaresFour },
+  { id: "calendar", label: "Calendar", icon: CalendarBlank },
   { id: "general", label: "General", icon: GearSix },
 ];
 
-let savedPage: PageId = "companion";
+let savedPage: SettingsPageId = "companion";
+
+export function openSettingsCalendarPage() {
+  savedPage = "calendar";
+  navigate("settings", "calendar");
+}
 
 const ACCENT_PRESETS = [
   { label: "Google Blue", hex: "#4285f4" },
@@ -163,13 +184,25 @@ const CATEGORY_MAP: Record<EffectCategory, AppearanceEffect[]> = {
  * 5. Display & System: Monitor, autostart, weather location
  */
 export function SettingsView() {
-  const [page, setPageState] = useState<PageId>(savedPage);
+  const curNav = nav.use();
+  const [page, setPageState] = useState<SettingsPageId>(() => {
+    if (curNav.section && pages.some((p) => p.id === curNav.section)) {
+      return curNav.section as SettingsPageId;
+    }
+    return savedPage;
+  });
   const scroller = useRef<HTMLDivElement>(null);
 
-  const setPage = (p: PageId) => {
+  const setPage = (p: SettingsPageId) => {
     savedPage = p;
     setPageState(p);
   };
+
+  useEffect(() => {
+    if (curNav.section && pages.some((p) => p.id === curNav.section)) {
+      setPage(curNav.section as SettingsPageId);
+    }
+  }, [curNav.section]);
 
   return (
     <div className="flex h-full gap-3 px-4 pt-1 pb-2">
@@ -234,6 +267,7 @@ export function SettingsView() {
             {page === "appearance" && <AppearancePage />}
             {page === "geometry" && <SizeAndTimingPage />}
             {page === "tabs" && <TabsPage />}
+            {page === "calendar" && <CalendarPage />}
             {page === "general" && <GeneralPage />}
           </motion.div>
         </AnimatePresence>
@@ -2112,5 +2146,275 @@ function CustomColorDot({
       />
       {selected && <Check size={11} weight="bold" className="pointer-events-none text-white drop-shadow" />}
     </label>
+  );
+}
+
+const CALENDAR_COLOR_PRESETS = [
+  "#8b5cf6", // Purple
+  "#3b82f6", // Blue
+  "#10b981", // Emerald
+  "#f59e0b", // Amber
+  "#ec4899", // Pink
+  "#06b6d4", // Cyan
+  "#e11d48", // Crimson
+];
+
+function CalendarPage() {
+  const state = calendarStore.use();
+  const s = settings.use();
+  const disabledCalendars = s.calendar?.disabledCalendars ?? [];
+  const subscriptions = s.calendar?.subscriptions ?? [];
+  const aliases = s.calendar?.calendarAliases ?? {};
+  const colors = s.calendar?.calendarColors ?? {};
+
+  const calendarList = useMemo(
+    () => getCalendarList(state.events, disabledCalendars, subscriptions, aliases, colors),
+    [state.events, disabledCalendars, subscriptions, aliases, colors]
+  );
+  const activeCount = calendarList.filter((c) => c.enabled).length;
+
+  const [editingCal, setEditingCal] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [colorPickerCal, setColorPickerCal] = useState<string | null>(null);
+
+  const startEditing = (cal: { name: string; displayName: string }) => {
+    setEditingCal(cal.name);
+    setEditName(cal.displayName);
+    setColorPickerCal(null);
+  };
+
+  const saveRename = (originalName: string) => {
+    renameCalendar(originalName, editName);
+    setEditingCal(null);
+  };
+
+  const cancelRename = () => {
+    setEditingCal(null);
+  };
+
+  return (
+    <div className="flex flex-col gap-3.5 pr-1 pb-6">
+      {/* Group 1: Google Account & Sync */}
+      <Group title="Google Calendar Account">
+        <Row
+          label="Account Status"
+          hint={
+            state.authenticated
+              ? `Connected as ${state.account || "Google Account"}`
+              : "Sign in with Google to sync all your personal & shared calendars"
+          }
+        >
+          {state.authenticated ? (
+            <div className="flex items-center gap-2">
+              <span className="flex items-center gap-1.5 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-300">
+                <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Connected</span>
+              </span>
+              <Button onClick={() => void openCalendarAuthWindow()}>
+                Switch Account
+              </Button>
+            </div>
+          ) : (
+            <Button primary onClick={() => void openCalendarAuthWindow()}>
+              Sign in with Google
+            </Button>
+          )}
+        </Row>
+
+        <Row
+          label="Sync Schedule"
+          hint={
+            state.lastSyncedMs
+              ? `Last synced ${new Date(state.lastSyncedMs).toLocaleTimeString()}`
+              : "Refreshes Google Calendar and all active subscriptions"
+          }
+        >
+          <Button onClick={() => void syncCalendar()} disabled={state.syncing}>
+            {state.syncing ? "Syncing..." : "Sync Now"}
+          </Button>
+        </Row>
+      </Group>
+
+      {/* Group 2: Mini-Island Display */}
+      <Group title="Island & Mini-Display">
+        <Row
+          label="Show Upcoming Events in Peek Pill"
+          hint="Displays ongoing meetings, event titles, and live countdowns in the closed island"
+        >
+          <Switch
+            label="Show in Peek Pill"
+            checked={s.calendar?.showInPill ?? true}
+            onChange={(show) =>
+              updateSettings((prev) => ({
+                ...prev,
+                calendar: {
+                  ...(prev.calendar ?? { disabledCalendars: [] }),
+                  showInPill: show,
+                },
+              }))
+            }
+          />
+        </Row>
+      </Group>
+
+      {/* Group 3: Active Calendars & Visibility */}
+      <Group
+        title={`Active Calendars (${activeCount} of ${calendarList.length} enabled)`}
+      >
+        <div className="flex items-center justify-between px-3 py-1 text-[11px] text-label-3 border-b border-separator">
+          <span>Rename calendars, customize colors, and choose which appear in schedule</span>
+          <button
+            type="button"
+            onClick={() => {
+              const allNames = calendarList.map((c) => c.name);
+              const shouldEnable = activeCount < calendarList.length;
+              toggleAllCalendars(allNames, shouldEnable);
+            }}
+            className="font-medium text-[var(--accent,#4285f4)] hover:underline"
+          >
+            {activeCount < calendarList.length ? "Select All" : "Deselect All"}
+          </button>
+        </div>
+
+        <div className="divide-y divide-separator">
+          {calendarList.length === 0 ? (
+            <div className="px-3.5 py-4 text-center text-caption text-label-3">
+              No calendars detected yet. Sign in with Google above to sync.
+            </div>
+          ) : (
+            calendarList.map((cal) => (
+              <div
+                key={cal.name}
+                className="flex flex-col gap-1.5 px-3.5 py-2.5 hover:bg-fill-1 transition-colors"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                    {/* Clickable Color Circle */}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setColorPickerCal(colorPickerCal === cal.name ? null : cal.name)
+                      }
+                      title="Change calendar color"
+                      className="size-3.5 shrink-0 rounded-full ring-1 ring-white/10 hover:scale-125 transition-transform"
+                      style={{ backgroundColor: cal.color }}
+                    />
+
+                    {editingCal === cal.name ? (
+                      <div className="flex items-center gap-1.5 flex-1 min-w-0 pr-2">
+                        <input
+                          type="text"
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") saveRename(cal.name);
+                            if (e.key === "Escape") cancelRename();
+                          }}
+                          autoFocus
+                          placeholder="Calendar Name"
+                          className="flex-1 rounded-md border border-[var(--accent,#4285f4)] bg-fill-2 px-2 py-0.5 text-footnote text-label focus:outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => saveRename(cal.name)}
+                          className="pressable flex size-6 items-center justify-center rounded-md bg-[var(--accent,#4285f4)] text-white hover:brightness-110"
+                          title="Save"
+                        >
+                          <Check size={12} weight="bold" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={cancelRename}
+                          className="pressable flex size-6 items-center justify-center rounded-md bg-fill-2 text-label-3 hover:text-label"
+                          title="Cancel"
+                        >
+                          <X size={12} weight="bold" />
+                        </button>
+                        {cal.displayName !== cal.name && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              renameCalendar(cal.name, "");
+                              setEditingCal(null);
+                            }}
+                            className="text-[10px] text-label-3 hover:text-red-400 hover:underline px-1"
+                            title="Reset to default name"
+                          >
+                            Reset
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <p className="truncate text-footnote font-medium text-label leading-tight">
+                            {cal.displayName}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => startEditing(cal)}
+                            title="Rename this calendar"
+                            className="pressable rounded p-0.5 text-label-3 hover:text-label hover:bg-fill-2 transition-colors"
+                          >
+                            <PencilSimple size={11} />
+                          </button>
+                        </div>
+                        <p className="truncate text-[10px] text-label-3">
+                          {cal.count} event{cal.count === 1 ? "" : "s"}
+                          {cal.displayName !== cal.name ? ` · Original: ${cal.name}` : ""}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    {cal.isSubscription && cal.subscriptionId && (
+                      <button
+                        type="button"
+                        onClick={() => removeCalendarSubscription(cal.subscriptionId!)}
+                        title="Remove subscription"
+                        className="pressable flex size-6 items-center justify-center rounded-full text-red-400 hover:bg-red-500/15"
+                      >
+                        <Trash size={12} weight="bold" />
+                      </button>
+                    )}
+                    <Switch
+                      label={`Enable ${cal.displayName}`}
+                      checked={cal.enabled}
+                      onChange={(enabled) => toggleCalendar(cal.name, enabled)}
+                    />
+                  </div>
+                </div>
+
+                {/* Inline Color Picker Palette */}
+                {colorPickerCal === cal.name && (
+                  <div className="flex items-center gap-2 pt-1 pl-6">
+                    <span className="text-[10px] text-label-3">Badge color:</span>
+                    <div className="flex items-center gap-1.5">
+                      {CALENDAR_COLOR_PRESETS.map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => {
+                            setCalendarColor(cal.name, c);
+                            setColorPickerCal(null);
+                          }}
+                          style={{ backgroundColor: c }}
+                          className={`size-3.5 rounded-full transition-transform ${
+                            cal.color === c
+                              ? "scale-125 ring-2 ring-white"
+                              : "opacity-80 hover:opacity-100 hover:scale-110"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      </Group>
+    </div>
   );
 }

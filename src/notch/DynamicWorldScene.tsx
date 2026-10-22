@@ -320,7 +320,7 @@ export function DynamicWorldScene({
       }
 
       // Celestial Sun / Moon (skip in Clipboard / Settings tabs when open to prevent colliding with top filter pills and cards)
-      const hideCelestial = statusRef.current === "open" && (activeTabRef.current === "clipboard" || activeTabRef.current === "settings");
+      const hideCelestial = statusRef.current === "open" && (activeTabRef.current === "clipboard" || activeTabRef.current === "calendar" || activeTabRef.current === "settings");
       const celestial = hideCelestial ? "off" : cfg.celestial;
       const isDaySun = celestial === "sun" || (celestial === "auto" && (resolvedTime === "day" || resolvedTime === "dawn" || resolvedTime === "sunset"));
       const isNightMoon = celestial === "moon" || (celestial === "auto" && (resolvedTime === "night" || resolvedTime === "dusk"));
